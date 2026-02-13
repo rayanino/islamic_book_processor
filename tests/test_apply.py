@@ -49,7 +49,10 @@ def test_apply_fails_closed_and_writes_mismatch_artifact(tmp_path):
     rc = main(["apply", "--runs-root", str(tmp_path / "runs"), "--run-id", "R2", "--book-id", "BK"])
     assert rc == 1
     mismatch = json.loads((artifacts / "apply.boundary_mismatch.json").read_text(encoding="utf-8"))
+    validation = json.loads((artifacts / "apply.validation_errors.json").read_text(encoding="utf-8"))
     assert mismatch["status"] == "failed_closed"
+    assert validation["status"] == "failed_closed"
+    assert validation["errors"][0]["approved_item"]["heading"] == "Missing"
     assert mismatch["mismatches"][0]["approved_item"]["heading"] == "Missing"
 
 

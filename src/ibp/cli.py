@@ -16,6 +16,7 @@ from ibp.ingest.manifest import build_book_manifest, manifest_as_jsonable, sorte
 from ibp.llm.verifier import LLMVerifier, is_ambiguous
 from ibp.logging import configure_run_logger
 from ibp.placement.engine import decision_as_jsonable, place_chunk
+from ibp.registry.service import RegistryService
 from ibp.qa import GuardrailViolationError, write_run_report
 from ibp.run_context import RunContext
 
@@ -395,6 +396,15 @@ def cmd_approve(args: argparse.Namespace) -> int:
     return 0
 
 
+def _parse_strict_heading(line: str) -> dict | None:
+    stripped = line.strip()
+    if not stripped.startswith(STRICT_MARKDOWN_HEADING_PREFIXES):
+        return None
+    marks = stripped.split(" ", 1)[0]
+    heading = stripped[len(marks):].strip()
+    return {"level": len(marks), "heading": heading}
+
+
 def cmd_apply(args: argparse.Namespace) -> int:
     run_dir = Path(args.runs_root) / args.run_id / args.book_id
     artifacts_dir = run_dir / "artifacts"
@@ -412,56 +422,149 @@ def cmd_apply(args: argparse.Namespace) -> int:
         raise ValueError("Approved plan must contain an 'items' list")
 
     markdown_lines = derived_book.read_text(encoding="utf-8").splitlines()
-    strict_headings = _split_by_strict_anchors(markdown_lines)
     topics = _load_topic_registry(artifacts_dir)
 
-    mismatches: list[dict] = []
-    matched_heading_indexes: list[int] = []
-    next_cursor = 0
+    validation_errors: list[dict] = []
+    mapped_items: list[dict] = []
+    search_cursor = 1
     for idx, approved in enumerate(approved_items):
         expected_heading = (approved.get("heading") or approved.get("title") or approved.get("text") or "").strip()
         expected_level = approved.get("level")
-        expected_line = approved.get("line_number") or approved.get("start_line")
+        expected_start = approved.get("line_number") or approved.get("start_line")
 
-        match_index = None
-        for i in range(next_cursor, len(strict_headings)):
-            candidate = strict_headings[i]
-            if expected_heading and candidate["heading"] != expected_heading:
-                continue
-            if expected_level and candidate["level"] != expected_level:
-                continue
-            if expected_line and candidate["line_number"] != expected_line:
-                continue
-            match_index = i
-            break
-
-        if match_index is None:
-            mismatches.append(
+        if not expected_heading:
+            validation_errors.append(
                 {
                     "approved_item_index": idx,
                     "approved_item": approved,
-                    "reason": "approved boundary did not map to a strict markdown heading in derived/book.md",
+                    "reason": "approved item missing heading text",
                 }
             )
             continue
-        next_cursor = match_index + 1
-        matched_heading_indexes.append(match_index)
 
-    if mismatches:
-        failure_reasons = [
-            "approved boundary did not map to a strict markdown heading in derived/book.md",
-        ]
-        _write_json(
-            artifacts_dir / "apply.boundary_mismatch.json",
+        mapped_line = None
+        parsed = None
+
+        if expected_start:
+            if not isinstance(expected_start, int) or expected_start < 1 or expected_start > len(markdown_lines):
+                validation_errors.append(
+                    {
+                        "approved_item_index": idx,
+                        "approved_item": approved,
+                        "reason": "approved start line is out of bounds for derived markdown",
+                    }
+                )
+                continue
+            mapped_line = expected_start
+            parsed = _parse_strict_heading(markdown_lines[mapped_line - 1])
+            if parsed is None:
+                validation_errors.append(
+                    {
+                        "approved_item_index": idx,
+                        "approved_item": approved,
+                        "reason": "approved start line is not a strict markdown heading",
+                    }
+                )
+                continue
+        else:
+            for line_number in range(search_cursor, len(markdown_lines) + 1):
+                candidate = _parse_strict_heading(markdown_lines[line_number - 1])
+                if candidate is None:
+                    continue
+                if candidate["heading"] != expected_heading:
+                    continue
+                if expected_level and candidate["level"] != expected_level:
+                    continue
+                mapped_line = line_number
+                parsed = candidate
+                break
+            if mapped_line is None or parsed is None:
+                validation_errors.append(
+                    {
+                        "approved_item_index": idx,
+                        "approved_item": approved,
+                        "reason": "approved item could not be mapped to a strict markdown heading",
+                    }
+                )
+                continue
+
+        if parsed["heading"] != expected_heading:
+            validation_errors.append(
+                {
+                    "approved_item_index": idx,
+                    "approved_item": approved,
+                    "reason": "approved heading text does not match derived markdown heading text",
+                    "derived_heading": parsed["heading"],
+                    "derived_line_number": mapped_line,
+                }
+            )
+            continue
+
+        if expected_level and parsed["level"] != expected_level:
+            validation_errors.append(
+                {
+                    "approved_item_index": idx,
+                    "approved_item": approved,
+                    "reason": "approved heading level does not match derived markdown heading level",
+                    "derived_level": parsed["level"],
+                    "derived_line_number": mapped_line,
+                }
+            )
+            continue
+
+        mapped_items.append(
             {
-                "book_id": args.book_id,
-                "run_id": args.run_id,
-                "status": "failed_closed",
-                "approved_item_count": len(approved_items),
-                "strict_heading_count": len(strict_headings),
-                "mismatches": mismatches,
-            },
+                "approved_item_index": idx,
+                "approved_item": approved,
+                "heading": parsed["heading"],
+                "level": parsed["level"],
+                "start_line": mapped_line,
+            }
         )
+        search_cursor = mapped_line + 1
+
+    for i, mapped in enumerate(mapped_items):
+        next_start = mapped_items[i + 1]["start_line"] if i + 1 < len(mapped_items) else len(markdown_lines) + 1
+        end_line = next_start - 1
+        mapped["end_line"] = end_line
+
+        approved = mapped["approved_item"]
+        expected_end = approved.get("end_line")
+        if expected_end is not None and expected_end != end_line:
+            validation_errors.append(
+                {
+                    "approved_item_index": mapped["approved_item_index"],
+                    "approved_item": approved,
+                    "reason": "approved end line does not match derived markdown line range",
+                    "derived_start_line": mapped["start_line"],
+                    "derived_end_line": end_line,
+                }
+            )
+
+    if len(mapped_items) != len(approved_items):
+        missing_count = len(approved_items) - len(mapped_items)
+        validation_errors.append(
+            {
+                "reason": "not all approved items mapped to derived markdown",
+                "approved_item_count": len(approved_items),
+                "mapped_item_count": len(mapped_items),
+                "missing_count": missing_count,
+            }
+        )
+
+    if validation_errors:
+        failure_reasons = ["approved chunk plan failed strict apply validation"]
+        validation_payload = {
+            "book_id": args.book_id,
+            "run_id": args.run_id,
+            "status": "failed_closed",
+            "approved_item_count": len(approved_items),
+            "mapped_item_count": len(mapped_items),
+            "errors": validation_errors,
+            "mismatches": validation_errors,
+        }
+        _write_json(artifacts_dir / "apply.validation_errors.json", validation_payload)
+        _write_json(artifacts_dir / "apply.boundary_mismatch.json", validation_payload)
         _write_run_report_status(
             run_dir,
             book_id=args.book_id,
@@ -472,36 +575,29 @@ def cmd_apply(args: argparse.Namespace) -> int:
         _write_run_state(run_dir, status="FAILED", stage="apply", failure_reasons=failure_reasons)
         return 1
 
-    registry = RegistryService(artifacts_dir=artifacts_dir, run_id=args.run_id)
-    registry.sync_topics(topics)
-
     review_items: list[dict] = []
     placement_items: list[dict] = []
     placement_proposed_items: list[dict] = []
-    for idx, approved in enumerate(approved_items):
-        heading_index = matched_heading_indexes[idx]
-        heading = strict_headings[heading_index]
-        heading_line_index = heading["line_number"] - 1
 
-        if idx + 1 < len(matched_heading_indexes):
-            next_heading_line_index = strict_headings[matched_heading_indexes[idx + 1]]["line_number"] - 1
-        else:
-            next_heading_line_index = len(markdown_lines)
+    registry = RegistryService(artifacts_dir=artifacts_dir, run_id=args.run_id)
+    try:
+        registry.sync_topics(topics)
 
-        body_lines = markdown_lines[heading_line_index + 1:next_heading_line_index]
-        chunk_body = "\n".join(line for line in body_lines if line.strip())
-        decision = place_chunk(
-            chunk_heading=heading.get("heading", ""),
-            chunk_body=chunk_body,
-            topics=topics,
-        )
-        jsonable = decision_as_jsonable(decision)
-        placement_payload = {
-            "approved_item_index": idx,
-            "approved_item": approved,
-            "chunk_features": {
-                "heading": heading.get("heading", ""),
+        for mapped in mapped_items:
+            idx = mapped["approved_item_index"]
+            approved = mapped["approved_item"]
+            heading = mapped["heading"]
+            start_line = mapped["start_line"]
+            end_line = mapped["end_line"]
+
+            body_lines = markdown_lines[start_line:end_line]
+            chunk_body = "\n".join(line for line in body_lines if line.strip())
+            decision = place_chunk(chunk_heading=heading, chunk_body=chunk_body, topics=topics)
+            jsonable = decision_as_jsonable(decision)
+            chunk_features = {
+                "heading": heading,
                 "body_excerpt": chunk_body[:500],
+                "line_range": {"start_line": start_line, "end_line": end_line},
             }
             placement_payload = {
                 "approved_item_index": idx,
@@ -511,44 +607,38 @@ def cmd_apply(args: argparse.Namespace) -> int:
             }
             placement_items.append(placement_payload)
 
-        proposal = {
-            **placement_payload,
-            "review_required": decision.status == "review",
-            "proposal_status": "pending_human_review" if decision.status == "review" else "deterministic_assignment",
-        }
-        placement_proposed_items.append(proposal)
+            chunk_key = f"{args.book_id}:{start_line}:{end_line}:{heading}"
+            chunk_version_id = registry.add_chunk_version(chunk_key=chunk_key, approved_item=approved, chunk_features=chunk_features)
+            registry.add_placement_decision(chunk_version_id=chunk_version_id, placement_payload=placement_payload)
 
-        if decision.status == "review":
-            review_items.append(
-                {
-                    "kind": "topic_placement",
-                    "approved_item_index": idx,
-                    "machine_reasons": jsonable["reasons"],
-                    "candidate_alternatives": jsonable["candidate_alternatives"],
-                    "chunk_features": placement_payload["chunk_features"],
-                    "approved_item": approved,
-                }
-            )
+            proposal = {
+                **placement_payload,
+                "review_required": decision.status == "review",
+                "proposal_status": "pending_human_review" if decision.status == "review" else "deterministic_assignment",
+            }
+            placement_proposed_items.append(proposal)
 
-    _write_json(
-        artifacts_dir / "topic_placements.proposed.json",
-        {
-            "book_id": args.book_id,
-            "run_id": args.run_id,
-            "status": "review_required" if review_items else "deterministic_only",
-            "items": placement_proposed_items,
-        },
-    )
+            if decision.status == "review":
+                review_items.append(
+                    {
+                        "kind": "topic_placement",
+                        "approved_item_index": idx,
+                        "machine_reasons": jsonable["reasons"],
+                        "candidate_alternatives": jsonable["candidate_alternatives"],
+                        "chunk_features": chunk_features,
+                        "approved_item": approved,
+                    }
+                )
 
-    _write_json(
-        artifacts_dir / "topic_placements.applied.json",
-        {
-            "book_id": args.book_id,
-            "run_id": args.run_id,
-            "topics_source": "artifacts/topic_registry.json#topics",
-            "items": placement_items,
-        },
-    )
+        _write_json(
+            artifacts_dir / "topic_placements.proposed.json",
+            {
+                "book_id": args.book_id,
+                "run_id": args.run_id,
+                "status": "review_required" if review_items else "deterministic_only",
+                "items": placement_proposed_items,
+            },
+        )
 
         _write_json(
             artifacts_dir / "topic_placements.applied.json",
@@ -560,21 +650,54 @@ def cmd_apply(args: argparse.Namespace) -> int:
             },
         )
 
-    _write_json(
-        artifacts_dir / "chunking.applied.json",
-        {
-            "book_id": args.book_id,
-            "run_id": args.run_id,
-            "status": "applied",
-            "boundaries_source": "artifacts/chunk_plan.approved.json#items",
-            "applied_items": approved_items,
-            "topic_placement": {
-                "status": "review_required" if review_items else "assigned",
-                "review_count": len(review_items),
-                "placements_source": "artifacts/topic_placements.applied.json#items",
+        if review_items:
+            _write_json(
+                run_dir / "_REVIEW" / "topic_placements.review.json",
+                {
+                    "book_id": args.book_id,
+                    "run_id": args.run_id,
+                    "status": "review_required",
+                    "items": review_items,
+                },
+            )
+
+        _write_json(
+            artifacts_dir / "chunking.applied.json",
+            {
+                "book_id": args.book_id,
+                "run_id": args.run_id,
+                "status": "applied",
+                "boundaries_source": "artifacts/chunk_plan.approved.json#items",
+                "applied_items": approved_items,
+                "mapped_ranges": [
+                    {
+                        "approved_item_index": m["approved_item_index"],
+                        "heading": m["heading"],
+                        "start_line": m["start_line"],
+                        "end_line": m["end_line"],
+                    }
+                    for m in mapped_items
+                ],
+                "topic_placement": {
+                    "status": "review_required" if review_items else "assigned",
+                    "review_count": len(review_items),
+                    "placements_source": "artifacts/topic_placements.applied.json#items",
+                },
             },
-        },
-    )
+        )
+
+        registry.add_projection(
+            projection_kind="chunking.applied",
+            source_ref="artifacts/chunk_plan.approved.json#items",
+            payload={
+                "book_id": args.book_id,
+                "run_id": args.run_id,
+                "applied_items": approved_items,
+                "placement_items": placement_items,
+            },
+        )
+    finally:
+        registry.close()
 
     approved_rows: list[dict] = []
     approved_rows_path = artifacts_dir / "heading_injections.approved.jsonl"
@@ -618,35 +741,6 @@ def cmd_apply(args: argparse.Namespace) -> int:
     )
     _write_run_state(run_dir, status="APPLIED", stage="apply", failure_reasons=[])
     return 0
-
-        _write_json(
-            artifacts_dir / "chunking.applied.json",
-            {
-                "book_id": args.book_id,
-                "run_id": args.run_id,
-                "status": "applied",
-                "boundaries_source": "artifacts/chunk_plan.approved.json#items",
-                "applied_items": approved_items,
-                "topic_placement": {
-                    "status": "review_required" if review_items else "assigned",
-                    "review_count": len(review_items),
-                    "placements_source": "artifacts/topic_placements.applied.json#items",
-                },
-            },
-        )
-        registry.add_projection(
-            projection_kind="chunking.applied",
-            source_ref="artifacts/chunk_plan.approved.json#items",
-            payload={
-                "book_id": args.book_id,
-                "run_id": args.run_id,
-                "applied_items": approved_items,
-                "placement_items": placement_items,
-            },
-        )
-        return 0
-    finally:
-        registry.close()
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="ibp", description="Islamic Book Processor")
