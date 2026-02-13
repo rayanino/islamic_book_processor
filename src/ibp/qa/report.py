@@ -69,7 +69,13 @@ def _build_markdown_report(run_id: str, book_id: str, metrics: QAMetricsBundle) 
     return "\n".join(lines) + "\n"
 
 
-def _build_json_report(run_id: str, book_id: str, metrics: QAMetricsBundle) -> dict[str, Any]:
+def _build_json_report(
+    run_id: str,
+    book_id: str,
+    metrics: QAMetricsBundle,
+    *,
+    anchor_measurement_metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     status = "failed" if metrics.guardrail_violations else "passed"
     return {
         "run_id": run_id,
@@ -80,6 +86,7 @@ def _build_json_report(run_id: str, book_id: str, metrics: QAMetricsBundle) -> d
             "anchor_miss_before": metrics.anchor.before,
             "anchor_miss_after": metrics.anchor.after,
             "anchor_miss_relative_reduction": metrics.anchor.relative_reduction,
+            "anchor_measurement": anchor_measurement_metadata or {},
             "must_not_heading_violations": [asdict(item) for item in metrics.must_not_heading_violations],
             "must_not_heading_violations_count": len(metrics.must_not_heading_violations),
             "false_positive": {
@@ -105,6 +112,7 @@ def write_run_report(
     train_path: Path = DEFAULT_TRAIN_PATH,
     holdout_path: Path = DEFAULT_HOLDOUT_PATH,
     minimum_relative_reduction: float = 0.0,
+    anchor_measurement_metadata: dict[str, Any] | None = None,
     fail_on_guardrails: bool = True,
 ) -> tuple[Path, Path, dict[str, Any]]:
     metrics = compute_qa_metrics(
@@ -122,7 +130,7 @@ def write_run_report(
     json_report_path = report_dir / "run_report.json"
     md_report_path = report_dir / "run_report.md"
 
-    report_payload = _build_json_report(run_id, book_id, metrics)
+    report_payload = _build_json_report(run_id, book_id, metrics, anchor_measurement_metadata=anchor_measurement_metadata)
     markdown_report = _build_markdown_report(run_id, book_id, metrics)
 
     json_report_path.write_text(

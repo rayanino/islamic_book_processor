@@ -139,6 +139,66 @@ def _measure_anchor_miss_after(approved_items: list[dict], markdown_lines: list[
     return before, misses
 
 
+def _measure_anchor_miss(approved_items: list[dict], markdown_lines: list[str]) -> int:
+    _, misses = _measure_anchor_miss_after(approved_items, markdown_lines)
+    return misses
+
+
+def _resolve_markdown_measurement_paths(run_dir: Path) -> tuple[Path | None, Path | None, dict]:
+    derived_dir = run_dir / "derived"
+    baseline_candidates = (
+        derived_dir / "book.baseline.md",
+        derived_dir / "book.without_injections.md",
+        derived_dir / "book.no_injections.md",
+        derived_dir / "book.original.md",
+    )
+    approved_candidates = (
+        derived_dir / "book.approved.md",
+        derived_dir / "book.with_approved_injections.md",
+        derived_dir / "book.md",
+    )
+
+    baseline_path = next((path for path in baseline_candidates if path.exists()), None)
+    approved_path = next((path for path in approved_candidates if path.exists()), None)
+
+    return baseline_path, approved_path, {
+        "strategy": "derived_markdown_pair",
+        "baseline_candidates": [str(path) for path in baseline_candidates],
+        "approved_candidates": [str(path) for path in approved_candidates],
+        "baseline_path": str(baseline_path) if baseline_path else None,
+        "approved_path": str(approved_path) if approved_path else None,
+    }
+
+
+def _compute_proposal_metrics(run_dir: Path, artifacts_dir: Path, approved_items: list[dict]) -> dict:
+    baseline_path, approved_path, method = _resolve_markdown_measurement_paths(run_dir)
+
+    if approved_path is None:
+        raise FileNotFoundError(f"Missing derived markdown with approved injections under: {run_dir / 'derived'}")
+
+    approved_lines = approved_path.read_text(encoding="utf-8").splitlines()
+    anchor_miss_after = _measure_anchor_miss(approved_items, approved_lines)
+
+    if baseline_path is not None:
+        baseline_lines = baseline_path.read_text(encoding="utf-8").splitlines()
+        anchor_miss_before = _measure_anchor_miss(approved_items, baseline_lines)
+        method["anchor_miss_before_source"] = "measured_baseline_derived_markdown"
+    else:
+        anchor_miss_before = len(approved_items)
+        method["anchor_miss_before_source"] = "fallback_legacy_count_no_baseline_run"
+
+    payload = {
+        "run_id": run_dir.parent.name,
+        "book_id": run_dir.name,
+        "measured_at": datetime.now(timezone.utc).isoformat(),
+        "anchor_miss_before": anchor_miss_before,
+        "anchor_miss_after": anchor_miss_after,
+        "measurement_method": method,
+    }
+    _write_json(artifacts_dir / "proposal.metrics.json", payload)
+    return payload
+
+
 def _write_run_state(run_dir: Path, *, status: str, stage: str, failure_reasons: list[str] | None = None) -> None:
     payload = _read_json(run_dir / "run_state.json")
     payload.update(
@@ -360,17 +420,18 @@ def cmd_approve(args: argparse.Namespace) -> int:
         _write_run_state(run_dir, status="FAILED", stage="approve", failure_reasons=failure_reasons)
         return 1
 
-    before, after = _measure_anchor_miss_after(items, derived_book.read_text(encoding="utf-8").splitlines())
+    metrics_payload = _compute_proposal_metrics(run_dir, artifacts_dir, items)
 
     try:
         write_run_report(
             run_id=args.run_id,
             book_id=args.book_id,
-            anchor_miss_before=before,
-            anchor_miss_after=after,
+            anchor_miss_before=metrics_payload["anchor_miss_before"],
+            anchor_miss_after=metrics_payload["anchor_miss_after"],
             decision_rows=approved_rows,
             output_root=Path(args.runs_root),
             minimum_relative_reduction=args.minimum_relative_reduction,
+            anchor_measurement_metadata=metrics_payload["measurement_method"],
             fail_on_guardrails=True,
         )
     except GuardrailViolationError as exc:
@@ -715,16 +776,17 @@ def cmd_apply(args: argparse.Namespace) -> int:
             if line.strip():
                 approved_rows.append(json.loads(line))
 
-    before, after = _measure_anchor_miss_after(approved_items, markdown_lines)
+    metrics_payload = _compute_proposal_metrics(run_dir, artifacts_dir, approved_items)
     try:
         write_run_report(
             run_id=args.run_id,
             book_id=args.book_id,
-            anchor_miss_before=before,
-            anchor_miss_after=after,
+            anchor_miss_before=metrics_payload["anchor_miss_before"],
+            anchor_miss_after=metrics_payload["anchor_miss_after"],
             decision_rows=approved_rows,
             output_root=Path(args.runs_root),
             minimum_relative_reduction=args.minimum_relative_reduction,
+            anchor_measurement_metadata=metrics_payload["measurement_method"],
             fail_on_guardrails=True,
         )
     except GuardrailViolationError as exc:

@@ -54,7 +54,10 @@ def test_approve_outputs_files(tmp_path, monkeypatch):
     derived.parent.mkdir(parents=True, exist_ok=True)
     derived.write_text("# Book\n\n## Intro\ntext\n", encoding="utf-8")
 
+    captured = {}
+
     def _write_ok_report(**kwargs):
+        captured.update(kwargs)
         report_path = run_root / "T1" / "BK001_shadha_al_urf" / "run_report.json"
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(
@@ -86,6 +89,10 @@ def test_approve_outputs_files(tmp_path, monkeypatch):
     assert (art / "heading_injections.approved.jsonl").exists()
     assert (art / "chunk_plan.approved.json").exists()
     assert (run_root / "T1" / "BK001_shadha_al_urf" / "run_report.json").exists()
+    metrics = json.loads((art / "proposal.metrics.json").read_text(encoding="utf-8"))
+    assert metrics["anchor_miss_before"] == captured["anchor_miss_before"]
+    assert metrics["anchor_miss_after"] == captured["anchor_miss_after"]
+    assert captured["anchor_measurement_metadata"]["strategy"] == "derived_markdown_pair"
 
 
 def test_approve_guardrail_violation_writes_terminal_failure_state(tmp_path, monkeypatch):
