@@ -92,6 +92,16 @@ MIGRATIONS: tuple[Migration, ...] = (
         CREATE INDEX IF NOT EXISTS idx_projections_run_kind ON projections(run_id, projection_kind);
         """,
     ),
+    Migration(
+        version=5,
+        name="create_topic_id_allocator",
+        sql="""
+        CREATE TABLE IF NOT EXISTS topic_id_allocator (
+            allocator_key TEXT PRIMARY KEY,
+            next_numeric_id INTEGER NOT NULL
+        );
+        """,
+    ),
 )
 
 

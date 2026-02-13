@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from ibp.config import sanitize_path_component
 from ibp.registry.migrations import ensure_migrations
 
 
@@ -39,16 +41,86 @@ class RegistryService:
         self.conn = sqlite3.connect(self.paths.db_path)
         self.conn.row_factory = sqlite3.Row
         ensure_migrations(self.conn)
+        self._ensure_topic_allocator_seed()
 
     def close(self) -> None:
         self.conn.close()
 
-    def sync_topics(self, topics: list[dict], created_by: str = "topic_registry_import") -> None:
+    def _ensure_topic_allocator_seed(self) -> None:
+        row = self.conn.execute(
+            "SELECT next_numeric_id FROM topic_id_allocator WHERE allocator_key = 'topic'"
+        ).fetchone()
+        if row is not None:
+            return
+
+        max_existing = self.conn.execute(
+            """
+            SELECT topic_id FROM topics
+            WHERE topic_id GLOB 'T[0-9][0-9][0-9][0-9][0-9][0-9]'
+            ORDER BY topic_id DESC
+            LIMIT 1
+            """
+        ).fetchone()
+        next_id = 1
+        if max_existing is not None:
+            next_id = int(str(max_existing[0])[1:]) + 1
+        self.conn.execute(
+            "INSERT INTO topic_id_allocator(allocator_key, next_numeric_id) VALUES('topic', ?)",
+            (next_id,),
+        )
+        self.conn.commit()
+
+    def _bump_topic_allocator_floor(self, topic_id: str) -> None:
+        if not re.fullmatch(r"T\d{6}", topic_id):
+            return
+        numeric_id = int(topic_id[1:])
+        row = self.conn.execute(
+            "SELECT next_numeric_id FROM topic_id_allocator WHERE allocator_key = 'topic'"
+        ).fetchone()
+        if row is None:
+            self._ensure_topic_allocator_seed()
+            row = self.conn.execute(
+                "SELECT next_numeric_id FROM topic_id_allocator WHERE allocator_key = 'topic'"
+            ).fetchone()
+        next_numeric_id = int(row[0])
+        if numeric_id >= next_numeric_id:
+            self.conn.execute(
+                "UPDATE topic_id_allocator SET next_numeric_id = ? WHERE allocator_key = 'topic'",
+                (numeric_id + 1,),
+            )
+
+    def _allocate_topic_id(self) -> str:
+        row = self.conn.execute(
+            "SELECT next_numeric_id FROM topic_id_allocator WHERE allocator_key = 'topic'"
+        ).fetchone()
+        if row is None:
+            self._ensure_topic_allocator_seed()
+            row = self.conn.execute(
+                "SELECT next_numeric_id FROM topic_id_allocator WHERE allocator_key = 'topic'"
+            ).fetchone()
+        numeric_id = int(row[0])
+        self.conn.execute(
+            "UPDATE topic_id_allocator SET next_numeric_id = ? WHERE allocator_key = 'topic'",
+            (numeric_id + 1,),
+        )
+        return f"T{numeric_id:06d}"
+
+    @staticmethod
+    def _topic_folder_name(topic_id: str, display_title_ar: str) -> str:
+        safe_title = sanitize_path_component(display_title_ar or topic_id)
+        return f"{topic_id}__{safe_title}"
+
+    def sync_topics(self, topics: list[dict], created_by: str = "topic_registry_import") -> list[dict]:
         now = _utc_now()
+        synced_topics: list[dict] = []
         for topic in topics:
             topic_id = (topic.get("topic_id") or "").strip()
             if not topic_id:
-                continue
+                topic_id = self._allocate_topic_id()
+            elif re.fullmatch(r"T\d{6}", topic_id):
+                self._bump_topic_allocator_floor(topic_id)
+            else:
+                topic_id = sanitize_path_component(topic_id)
             display_title = (
                 topic.get("display_title_ar")
                 or topic.get("title")
@@ -84,7 +156,63 @@ class RegistryService:
                     now,
                 ),
             )
+            synced_topic = dict(topic)
+            synced_topic["topic_id"] = topic_id
+            synced_topic["display_title_ar"] = display_title
+            synced_topic["aliases"] = aliases
+            synced_topic["status"] = status
+            synced_topic["parent_topic_id"] = parent_topic_id
+            synced_topic["topic_folder_name"] = self._topic_folder_name(topic_id=topic_id, display_title_ar=display_title)
+            synced_topics.append(synced_topic)
         self.conn.commit()
+        self.export_topics()
+        return synced_topics
+
+    def export_topics(self, topic_ids: list[str] | None = None) -> list[dict]:
+        where = ""
+        params: tuple[str, ...] = ()
+        if topic_ids:
+            placeholders = ",".join("?" for _ in topic_ids)
+            where = f"WHERE topic_id IN ({placeholders})"
+            params = tuple(topic_ids)
+
+        rows = self.conn.execute(
+            f"""
+            SELECT topic_id, parent_topic_id, display_title_ar, aliases_json, status,
+                   created_by, created_at, updated_at
+            FROM topics
+            {where}
+            ORDER BY topic_id
+            """,
+            params,
+        ).fetchall()
+
+        topics: list[dict] = []
+        for row in rows:
+            aliases = json.loads(row["aliases_json"] or "[]")
+            topics.append(
+                {
+                    "topic_id": row["topic_id"],
+                    "parent_topic_id": row["parent_topic_id"],
+                    "display_title_ar": row["display_title_ar"],
+                    "aliases": aliases,
+                    "status": row["status"],
+                    "created_by": row["created_by"],
+                    "created_at": row["created_at"],
+                    "updated_at": row["updated_at"],
+                    "topic_folder_name": self._topic_folder_name(
+                        topic_id=row["topic_id"],
+                        display_title_ar=row["display_title_ar"],
+                    ),
+                }
+            )
+
+        payload = {"topics": topics}
+        (self.paths.registry_dir / "topics.json").write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        return topics
 
     def add_chunk_version(self, chunk_key: str, approved_item: dict, chunk_features: dict) -> int:
         now = _utc_now()

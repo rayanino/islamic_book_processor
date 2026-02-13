@@ -651,7 +651,7 @@ def cmd_apply(args: argparse.Namespace) -> int:
 
     registry = RegistryService(artifacts_dir=artifacts_dir, run_id=args.run_id)
     try:
-        registry.sync_topics(topics)
+        topics = registry.sync_topics(topics)
 
         for mapped in mapped_items:
             idx = mapped["approved_item_index"]
@@ -715,7 +715,7 @@ def cmd_apply(args: argparse.Namespace) -> int:
             {
                 "book_id": args.book_id,
                 "run_id": args.run_id,
-                "topics_source": "artifacts/topic_registry.json#topics",
+                "topics_source": "artifacts/registry/topics.json#topics",
                 "items": placement_items,
             },
         )
