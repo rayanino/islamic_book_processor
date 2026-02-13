@@ -16,6 +16,7 @@ from ibp.ingest.manifest import build_book_manifest, manifest_as_jsonable, sorte
 from ibp.llm.verifier import LLMVerifier, is_ambiguous
 from ibp.logging import configure_run_logger
 from ibp.placement.engine import decision_as_jsonable, place_chunk
+from ibp.registry import RegistryService
 from ibp.run_context import RunContext
 
 
@@ -352,6 +353,9 @@ def cmd_apply(args: argparse.Namespace) -> int:
         )
         return 1
 
+    registry = RegistryService(artifacts_dir=artifacts_dir, run_id=args.run_id)
+    registry.sync_topics(topics)
+
     review_items: list[dict] = []
     placement_items: list[dict] = []
     placement_proposed_items: list[dict] = []
@@ -379,10 +383,14 @@ def cmd_apply(args: argparse.Namespace) -> int:
             "chunk_features": {
                 "heading": heading.get("heading", ""),
                 "body_excerpt": chunk_body[:500],
-            },
-            **jsonable,
-        }
-        placement_items.append(placement_payload)
+            }
+            placement_payload = {
+                "approved_item_index": idx,
+                "approved_item": approved,
+                "chunk_features": chunk_features,
+                **jsonable,
+            }
+            placement_items.append(placement_payload)
 
         proposal = {
             **placement_payload,
@@ -423,34 +431,55 @@ def cmd_apply(args: argparse.Namespace) -> int:
         },
     )
 
-    if review_items:
         _write_json(
-            run_dir / "_REVIEW" / "topic_placements.review.json",
+            artifacts_dir / "topic_placements.applied.json",
             {
                 "book_id": args.book_id,
                 "run_id": args.run_id,
-                "status": "review_required",
-                "items": review_items,
+                "topics_source": "artifacts/topic_registry.json#topics",
+                "items": placement_items,
             },
         )
 
-    _write_json(
-        artifacts_dir / "chunking.applied.json",
-        {
-            "book_id": args.book_id,
-            "run_id": args.run_id,
-            "status": "applied",
-            "boundaries_source": "artifacts/chunk_plan.approved.json#items",
-            "applied_items": approved_items,
-            "topic_placement": {
-                "status": "review_required" if review_items else "assigned",
-                "review_count": len(review_items),
-                "placements_source": "artifacts/topic_placements.applied.json#items",
-            },
-        },
-    )
-    return 0
+        if review_items:
+            _write_json(
+                run_dir / "_REVIEW" / "topic_placements.review.json",
+                {
+                    "book_id": args.book_id,
+                    "run_id": args.run_id,
+                    "status": "review_required",
+                    "items": review_items,
+                },
+            )
 
+        _write_json(
+            artifacts_dir / "chunking.applied.json",
+            {
+                "book_id": args.book_id,
+                "run_id": args.run_id,
+                "status": "applied",
+                "boundaries_source": "artifacts/chunk_plan.approved.json#items",
+                "applied_items": approved_items,
+                "topic_placement": {
+                    "status": "review_required" if review_items else "assigned",
+                    "review_count": len(review_items),
+                    "placements_source": "artifacts/topic_placements.applied.json#items",
+                },
+            },
+        )
+        registry.add_projection(
+            projection_kind="chunking.applied",
+            source_ref="artifacts/chunk_plan.approved.json#items",
+            payload={
+                "book_id": args.book_id,
+                "run_id": args.run_id,
+                "applied_items": approved_items,
+                "placement_items": placement_items,
+            },
+        )
+        return 0
+    finally:
+        registry.close()
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="ibp", description="Islamic Book Processor")

@@ -1,3 +1,4 @@
+import sqlite3
 import json
 from pathlib import Path
 
@@ -117,3 +118,48 @@ def test_apply_uses_registry_topic_id_for_high_confidence_placement(tmp_path):
     assert placements["items"][0]["status"] == "assigned"
     assert placements["items"][0]["chosen_topic_id"] == "topic_nahw"
     assert not (run_dir / "_REVIEW" / "topic_placements.review.json").exists()
+
+
+def test_apply_persists_registry_entities_in_sqlite(tmp_path):
+    run_dir = tmp_path / "runs" / "R5" / "BK"
+    artifacts = run_dir / "artifacts"
+    _write(run_dir / "derived" / "book.md", "# Book\n\n## فقه\nتفاصيل فقه\n")
+    _write(
+        artifacts / "chunk_plan.approved.json",
+        json.dumps({"items": [{"heading": "فقه", "level": 2, "line_number": 3}]}),
+    )
+    _write(
+        artifacts / "topic_registry.json",
+        json.dumps(
+            {
+                "topics": [
+                    {
+                        "topic_id": "topic_fiqh",
+                        "display_title_ar": "فقه",
+                        "aliases": ["أحكام"],
+                        "status": "active",
+                        "created_by": "seed",
+                    }
+                ]
+            }
+        ),
+    )
+
+    rc = main(["apply", "--runs-root", str(tmp_path / "runs"), "--run-id", "R5", "--book-id", "BK"])
+    assert rc == 0
+
+    db_path = artifacts / "registry" / "registry.sqlite3"
+    assert db_path.exists()
+    conn = sqlite3.connect(db_path)
+    try:
+        topic = conn.execute("SELECT topic_id, display_title_ar FROM topics").fetchone()
+        assert topic == ("topic_fiqh", "فقه")
+
+        chunk_count = conn.execute("SELECT COUNT(*) FROM chunk_versions").fetchone()[0]
+        placement_count = conn.execute("SELECT COUNT(*) FROM placement_decisions").fetchone()[0]
+        projection_count = conn.execute("SELECT COUNT(*) FROM projections").fetchone()[0]
+        assert chunk_count == 1
+        assert placement_count == 1
+        assert projection_count == 1
+    finally:
+        conn.close()
