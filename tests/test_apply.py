@@ -144,6 +144,7 @@ def test_apply_persists_registry_entities_in_sqlite(tmp_path):
                         "aliases": ["أحكام"],
                         "status": "active",
                         "created_by": "seed",
+                        "notes": "core jurisprudence",
                     }
                 ]
             }
@@ -163,9 +164,13 @@ def test_apply_persists_registry_entities_in_sqlite(tmp_path):
         chunk_count = conn.execute("SELECT COUNT(*) FROM chunk_versions").fetchone()[0]
         placement_count = conn.execute("SELECT COUNT(*) FROM placement_decisions").fetchone()[0]
         projection_count = conn.execute("SELECT COUNT(*) FROM projections").fetchone()[0]
+        provenance_count = conn.execute("SELECT COUNT(*) FROM placement_decision_provenance").fetchone()[0]
+        note = conn.execute("SELECT notes FROM topic_notes WHERE topic_id = ?", ("topic_fiqh",)).fetchone()[0]
         assert chunk_count == 1
         assert placement_count == 1
         assert projection_count == 1
+        assert provenance_count == 1
+        assert note == "core jurisprudence"
     finally:
         conn.close()
 

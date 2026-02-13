@@ -102,6 +102,73 @@ MIGRATIONS: tuple[Migration, ...] = (
         );
         """,
     ),
+    Migration(
+        version=6,
+        name="create_topic_notes",
+        sql="""
+        CREATE TABLE IF NOT EXISTS topic_notes (
+            topic_id TEXT PRIMARY KEY,
+            notes TEXT NOT NULL DEFAULT '',
+            updated_by TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY(topic_id) REFERENCES topics(topic_id)
+        );
+        """,
+    ),
+    Migration(
+        version=7,
+        name="create_chunk_lineage_links",
+        sql="""
+        CREATE TABLE IF NOT EXISTS chunk_lineage_links (
+            lineage_link_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            from_chunk_version_id INTEGER NOT NULL,
+            to_chunk_version_id INTEGER NOT NULL,
+            link_kind TEXT NOT NULL,
+            reason TEXT,
+            linked_at TEXT NOT NULL,
+            FOREIGN KEY(from_chunk_version_id) REFERENCES chunk_versions(chunk_version_id),
+            FOREIGN KEY(to_chunk_version_id) REFERENCES chunk_versions(chunk_version_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_chunk_lineage_from ON chunk_lineage_links(from_chunk_version_id);
+        CREATE INDEX IF NOT EXISTS idx_chunk_lineage_to ON chunk_lineage_links(to_chunk_version_id);
+        """,
+    ),
+    Migration(
+        version=8,
+        name="create_placement_decision_provenance",
+        sql="""
+        CREATE TABLE IF NOT EXISTS placement_decision_provenance (
+            provenance_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            placement_decision_id INTEGER NOT NULL,
+            run_id TEXT NOT NULL,
+            reviewer_id TEXT NOT NULL,
+            reviewer_action TEXT NOT NULL,
+            provenance_json TEXT NOT NULL,
+            recorded_at TEXT NOT NULL,
+            FOREIGN KEY(placement_decision_id) REFERENCES placement_decisions(placement_decision_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_placement_provenance_run_reviewer
+            ON placement_decision_provenance(run_id, reviewer_id);
+        """,
+    ),
+    Migration(
+        version=9,
+        name="create_projection_regenerations",
+        sql="""
+        CREATE TABLE IF NOT EXISTS projection_regenerations (
+            regeneration_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            projection_id INTEGER NOT NULL,
+            run_id TEXT NOT NULL,
+            regeneration_reason TEXT NOT NULL,
+            regenerated_by TEXT NOT NULL,
+            metadata_json TEXT NOT NULL,
+            regenerated_at TEXT NOT NULL,
+            FOREIGN KEY(projection_id) REFERENCES projections(projection_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_projection_regenerations_projection_id
+            ON projection_regenerations(projection_id);
+        """,
+    ),
 )
 
 

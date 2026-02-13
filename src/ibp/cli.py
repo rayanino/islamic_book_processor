@@ -678,8 +678,13 @@ def cmd_apply(args: argparse.Namespace) -> int:
             placement_items.append(placement_payload)
 
             chunk_key = f"{args.book_id}:{start_line}:{end_line}:{heading}"
-            chunk_version_id = registry.add_chunk_version(chunk_key=chunk_key, approved_item=approved, chunk_features=chunk_features)
-            registry.add_placement_decision(chunk_version_id=chunk_version_id, placement_payload=placement_payload)
+            registry.record_chunk_placement(
+                chunk_key=chunk_key,
+                approved_item=approved,
+                chunk_features=chunk_features,
+                placement_payload=placement_payload,
+                reviewer_id="system_apply",
+            )
 
             proposal = {
                 **placement_payload,
@@ -765,6 +770,7 @@ def cmd_apply(args: argparse.Namespace) -> int:
                 "applied_items": approved_items,
                 "placement_items": placement_items,
             },
+            regenerated_by="system_apply",
         )
     finally:
         registry.close()
