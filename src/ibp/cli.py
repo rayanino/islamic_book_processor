@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import os
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -12,6 +13,7 @@ from ibp.chunking.plan import build_strict_anchor_boundaries, chunk_plan_json, c
 from ibp.headings.candidates import candidates_jsonable, extract_layer_a_candidates
 from ibp.headings.scoring import score_candidates, scored_jsonable
 from ibp.ingest.manifest import build_book_manifest, manifest_as_jsonable, sorted_source_files
+from ibp.llm.verifier import LLMVerifier, is_ambiguous
 from ibp.logging import configure_run_logger
 from ibp.placement.engine import decision_as_jsonable, place_chunk
 from ibp.run_context import RunContext
@@ -34,6 +36,21 @@ def _write_jsonl(path: Path, rows: list[dict]) -> None:
     with path.open("w", encoding="utf-8") as handle:
         for row in rows:
             handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
+def _heuristic_llm_provider(request: dict) -> dict:
+    candidate = request.get("candidate") or {}
+    text = str(candidate.get("text", "")).strip()
+    headingish = any(tok in text for tok in ("باب", "فصل", "كتاب", "تنبيه", "مسألة", "مقدمة", "خاتمة"))
+    level = 3 if any(tok in text for tok in ("فصل", "تنبيه", "مسألة")) else 2
+    confidence = 0.75 if headingish else 0.35
+    return {
+        "is_heading": bool(headingish),
+        "level": level,
+        "normalized_title": text,
+        "confidence": confidence,
+        "reason": "title" if headingish else "body_line",
+    }
 
 
 def _split_by_strict_anchors(markdown_lines: list[str]) -> list[dict]:
@@ -144,13 +161,50 @@ def cmd_propose(args: argparse.Namespace) -> int:
     scored = score_candidates(candidates, signals)
     score_map = {row.candidate_id: row for row in scored}
 
+    ambiguous_candidates = [asdict(c) for c in candidates if is_ambiguous(score_map[c.candidate_id].score)]
+    llm_model = os.getenv("IBP_LLM_MODEL", "heuristic-llm-v1")
+    verifier = LLMVerifier(
+        run_id=run_id,
+        model=llm_model,
+        artifacts_dir=artifacts_dir,
+        provider=_heuristic_llm_provider,
+    )
+    llm_results: dict[str, dict] = {}
+    llm_errors: list[dict] = []
+    for cand in ambiguous_candidates:
+        try:
+            result = verifier.verify_candidate(cand)
+            llm_results[result.candidate_id] = {
+                "candidate_id": result.candidate_id,
+                "signature": result.signature,
+                "model": result.model,
+                "prompt_hash": result.prompt_hash,
+                "from_cache": result.from_cache,
+                "decision": asdict(result.decision),
+            }
+        except Exception as exc:  # noqa: BLE001
+            llm_errors.append({"candidate_id": cand.get("candidate_id"), "error": str(exc)})
+
     heading_rows: list[dict] = []
     proposed_lines: list[str] = []
     for cand in candidates:
         score = score_map[cand.candidate_id]
+        llm = llm_results.get(cand.candidate_id)
+
         is_heading = score.suggested_is_heading
-        proposed_level = max(2, min(6, score.suggested_level))
-        proposed_heading = f"{'#' * proposed_level} {cand.text}"
+        proposed_level = score.suggested_level
+        proposed_text = cand.text
+        suggestion_source = "deterministic"
+
+        if llm is not None:
+            llm_decision = llm["decision"]
+            is_heading = bool(llm_decision["is_heading"])
+            proposed_level = int(llm_decision["level"])
+            proposed_text = llm_decision["normalized_title"] or cand.text
+            suggestion_source = "llm_advisory"
+
+        proposed_level = max(2, min(6, proposed_level))
+        proposed_heading = f"{'#' * proposed_level} {proposed_text}"
         if is_heading:
             proposed_lines.append(proposed_heading)
         heading_rows.append(
@@ -158,8 +212,11 @@ def cmd_propose(args: argparse.Namespace) -> int:
                 **asdict(cand),
                 "score": score.score,
                 "suggested": asdict(score),
+                "llm_verifier": llm,
                 "proposal": "inject_heading" if is_heading else "skip",
                 "review_required": True,
+                "review_reason": "llm_advisory_requires_human_review" if llm is not None else "human_approval_required",
+                "suggestion_source": suggestion_source,
                 "strict_anchor_eligible": is_heading,
                 "is_heading": is_heading,
             }
@@ -168,6 +225,19 @@ def cmd_propose(args: argparse.Namespace) -> int:
     _write_jsonl(artifacts_dir / "heading_injections.proposed.jsonl", heading_rows)
     _write_json(artifacts_dir / "heading_candidates.debug.json", {"items": candidates_jsonable(candidates)})
     _write_json(artifacts_dir / "heading_scores.debug.json", {"items": scored_jsonable(scored)})
+    _write_json(
+        artifacts_dir / "heading_llm_verifier.debug.json",
+        {
+            "run_id": run_id,
+            "book_id": book_id,
+            "model": llm_model,
+            "ambiguous_candidate_count": len(ambiguous_candidates),
+            "verified_count": len(llm_results),
+            "error_count": len(llm_errors),
+            "items": list(llm_results.values()),
+            "errors": llm_errors,
+        },
+    )
 
     _split_by_strict_anchors(proposed_lines)
     plan = build_strict_anchor_boundaries(book_id=book_id, proposed_heading_lines=proposed_lines)
@@ -284,6 +354,7 @@ def cmd_apply(args: argparse.Namespace) -> int:
 
     review_items: list[dict] = []
     placement_items: list[dict] = []
+    placement_proposed_items: list[dict] = []
     for idx, approved in enumerate(approved_items):
         heading_index = matched_heading_indexes[idx]
         heading = strict_headings[heading_index]
@@ -313,6 +384,13 @@ def cmd_apply(args: argparse.Namespace) -> int:
         }
         placement_items.append(placement_payload)
 
+        proposal = {
+            **placement_payload,
+            "review_required": decision.status == "review",
+            "proposal_status": "pending_human_review" if decision.status == "review" else "deterministic_assignment",
+        }
+        placement_proposed_items.append(proposal)
+
         if decision.status == "review":
             review_items.append(
                 {
@@ -324,6 +402,16 @@ def cmd_apply(args: argparse.Namespace) -> int:
                     "approved_item": approved,
                 }
             )
+
+    _write_json(
+        artifacts_dir / "topic_placements.proposed.json",
+        {
+            "book_id": args.book_id,
+            "run_id": args.run_id,
+            "status": "review_required" if review_items else "deterministic_only",
+            "items": placement_proposed_items,
+        },
+    )
 
     _write_json(
         artifacts_dir / "topic_placements.applied.json",

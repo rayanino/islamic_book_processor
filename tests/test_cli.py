@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 
 from ibp.cli import main
 
@@ -24,6 +25,11 @@ def test_propose_creates_artifacts(tmp_path, monkeypatch):
     assert (art / "manifest.json").exists()
     assert (art / "heading_injections.proposed.jsonl").exists()
     assert (art / "chunk_plan.proposed.json").exists()
+    assert (art / "heading_llm_verifier.debug.json").exists()
+
+    first_row = json.loads((art / "heading_injections.proposed.jsonl").read_text(encoding="utf-8").splitlines()[0])
+    assert first_row["review_required"] is True
+    assert "suggestion_source" in first_row
 
 
 def test_approve_outputs_files(tmp_path, monkeypatch):
