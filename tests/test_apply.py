@@ -166,3 +166,31 @@ def test_apply_persists_registry_entities_in_sqlite(tmp_path):
         assert projection_count == 1
     finally:
         conn.close()
+
+
+def test_apply_guardrail_violation_writes_terminal_failure_state(tmp_path, monkeypatch):
+    run_dir = tmp_path / "runs" / "R6" / "BK"
+    artifacts = run_dir / "artifacts"
+    _write(run_dir / "derived" / "book.md", "# Book\n\n## Intro\ntext\n")
+    _write(artifacts / "chunk_plan.approved.json", json.dumps({"items": [{"heading": "Intro", "level": 2}]}))
+
+    from ibp.qa import GuardrailViolationError
+
+    def _raise_guardrail(**kwargs):
+        report_path = run_dir / "run_report.json"
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(
+            json.dumps({"guardrail_violations": ["anchor_miss_after must be lower than anchor_miss_before"]}),
+            encoding="utf-8",
+        )
+        raise GuardrailViolationError("Mandatory guardrails violated")
+
+    monkeypatch.setattr("ibp.cli.write_run_report", _raise_guardrail)
+    rc = main(["apply", "--runs-root", str(tmp_path / "runs"), "--run-id", "R6", "--book-id", "BK", "--mode", "development"])
+    assert rc == 1
+
+    run_state = json.loads((run_dir / "run_state.json").read_text(encoding="utf-8"))
+    run_report = json.loads((run_dir / "run_report.json").read_text(encoding="utf-8"))
+    assert run_state["status"] == "QA_FAILED"
+    assert "anchor_miss_after must be lower than anchor_miss_before" in run_state["failure_reasons"]
+    assert run_report["status"] == "qa_failed"

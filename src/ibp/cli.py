@@ -165,6 +165,17 @@ def _write_run_report_status(run_dir: Path, *, book_id: str, run_id: str, status
     _write_json(run_dir / "run_report.json", payload)
 
 
+def _guardrail_failure_reasons(run_dir: Path, error: GuardrailViolationError) -> list[str]:
+    report_payload = _read_json(run_dir / "run_report.json")
+    violations = report_payload.get("guardrail_violations")
+    if isinstance(violations, list):
+        details = [str(item).strip() for item in violations if str(item).strip()]
+        if details:
+            return details
+    message = str(error).strip()
+    return [message] if message else ["Mandatory guardrails violated"]
+
+
 def cmd_scan(args: argparse.Namespace) -> int:
     runs_dir = getattr(args, "runs_root", None) or getattr(args, "runs_dir", "runs")
     ctx = RunContext.create(book_id=args.book_id, runs_dir=runs_dir)
@@ -351,7 +362,6 @@ def cmd_approve(args: argparse.Namespace) -> int:
 
     before, after = _measure_anchor_miss_after(items, derived_book.read_text(encoding="utf-8").splitlines())
 
-    fail_on_guardrails = args.mode == "production"
     try:
         write_run_report(
             run_id=args.run_id,
@@ -361,19 +371,18 @@ def cmd_approve(args: argparse.Namespace) -> int:
             decision_rows=approved_rows,
             output_root=Path(args.runs_root),
             minimum_relative_reduction=args.minimum_relative_reduction,
-            fail_on_guardrails=fail_on_guardrails,
+            fail_on_guardrails=True,
         )
-    except GuardrailViolationError:
-        report_payload = _read_json(run_dir / "run_report.json")
-        failure_reasons = report_payload.get("guardrail_violations") or ["Mandatory guardrails violated"]
+    except GuardrailViolationError as exc:
+        failure_reasons = _guardrail_failure_reasons(run_dir, exc)
         _write_run_report_status(
             run_dir,
             book_id=args.book_id,
             run_id=args.run_id,
-            status="failed",
+            status="qa_failed",
             failure_reasons=failure_reasons,
         )
-        _write_run_state(run_dir, status="FAILED", stage="approve", failure_reasons=failure_reasons)
+        _write_run_state(run_dir, status="QA_FAILED", stage="approve", failure_reasons=failure_reasons)
         return 1
 
     if proposed_plan.exists():
@@ -707,7 +716,6 @@ def cmd_apply(args: argparse.Namespace) -> int:
                 approved_rows.append(json.loads(line))
 
     before, after = _measure_anchor_miss_after(approved_items, markdown_lines)
-    fail_on_guardrails = args.mode == "production"
     try:
         write_run_report(
             run_id=args.run_id,
@@ -717,19 +725,18 @@ def cmd_apply(args: argparse.Namespace) -> int:
             decision_rows=approved_rows,
             output_root=Path(args.runs_root),
             minimum_relative_reduction=args.minimum_relative_reduction,
-            fail_on_guardrails=fail_on_guardrails,
+            fail_on_guardrails=True,
         )
-    except GuardrailViolationError:
-        report_payload = _read_json(run_dir / "run_report.json")
-        failure_reasons = report_payload.get("guardrail_violations") or ["Mandatory guardrails violated"]
+    except GuardrailViolationError as exc:
+        failure_reasons = _guardrail_failure_reasons(run_dir, exc)
         _write_run_report_status(
             run_dir,
             book_id=args.book_id,
             run_id=args.run_id,
-            status="failed",
+            status="qa_failed",
             failure_reasons=failure_reasons,
         )
-        _write_run_state(run_dir, status="FAILED", stage="apply", failure_reasons=failure_reasons)
+        _write_run_state(run_dir, status="QA_FAILED", stage="apply", failure_reasons=failure_reasons)
         return 1
 
     _write_run_report_status(
