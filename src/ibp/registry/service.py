@@ -131,6 +131,7 @@ class RegistryService:
             if not isinstance(aliases, list):
                 aliases = []
             status = topic.get("status") or "active"
+            notes = str(topic.get("notes") or "")
             parent_topic_id = topic.get("parent_topic_id")
             self.conn.execute(
                 """
@@ -161,9 +162,22 @@ class RegistryService:
             synced_topic["display_title_ar"] = display_title
             synced_topic["aliases"] = aliases
             synced_topic["status"] = status
+            synced_topic["notes"] = notes
             synced_topic["parent_topic_id"] = parent_topic_id
             synced_topic["topic_folder_name"] = self._topic_folder_name(topic_id=topic_id, display_title_ar=display_title)
             synced_topics.append(synced_topic)
+
+            self.conn.execute(
+                """
+                INSERT INTO topic_notes(topic_id, notes, updated_by, updated_at)
+                VALUES(?, ?, ?, ?)
+                ON CONFLICT(topic_id) DO UPDATE SET
+                    notes=excluded.notes,
+                    updated_by=excluded.updated_by,
+                    updated_at=excluded.updated_at
+                """,
+                (topic_id, notes, created_by, now),
+            )
         self.conn.commit()
         self.export_topics()
         return synced_topics
@@ -178,11 +192,13 @@ class RegistryService:
 
         rows = self.conn.execute(
             f"""
-            SELECT topic_id, parent_topic_id, display_title_ar, aliases_json, status,
-                   created_by, created_at, updated_at
+            SELECT t.topic_id, t.parent_topic_id, t.display_title_ar, t.aliases_json, t.status,
+                   t.created_by, t.created_at, t.updated_at, COALESCE(n.notes, '') AS notes
             FROM topics
-            {where}
-            ORDER BY topic_id
+            AS t
+            LEFT JOIN topic_notes AS n ON n.topic_id = t.topic_id
+            {where.replace('topic_id', 't.topic_id')}
+            ORDER BY t.topic_id
             """,
             params,
         ).fetchall()
@@ -197,6 +213,7 @@ class RegistryService:
                     "display_title_ar": row["display_title_ar"],
                     "aliases": aliases,
                     "status": row["status"],
+                    "notes": row["notes"],
                     "created_by": row["created_by"],
                     "created_at": row["created_at"],
                     "updated_at": row["updated_at"],
@@ -247,16 +264,32 @@ class RegistryService:
             ),
         )
         self.conn.commit()
-        return int(cur.lastrowid)
+        chunk_version_id = int(cur.lastrowid)
+        if supersedes_id is not None:
+            self.conn.execute(
+                """
+                INSERT INTO chunk_lineage_links(
+                    from_chunk_version_id, to_chunk_version_id, link_kind, reason, linked_at
+                ) VALUES(?, ?, ?, ?, ?)
+                """,
+                (supersedes_id, chunk_version_id, "deprecates", "canonical_replacement", now),
+            )
+            self.conn.commit()
+        return chunk_version_id
 
-    def add_placement_decision(self, chunk_version_id: int, placement_payload: dict) -> None:
+    def add_placement_decision(
+        self,
+        chunk_version_id: int,
+        placement_payload: dict,
+        reviewer_id: str = "system_apply",
+    ) -> None:
         confidence = float(placement_payload.get("confidence") or 0.0)
         reviewer_action = "needs_review" if placement_payload.get("status") == "review" else "auto_assigned"
         rationale = {
             "reasons": placement_payload.get("reasons", []),
             "candidate_alternatives": placement_payload.get("candidate_alternatives", []),
         }
-        self.conn.execute(
+        cur = self.conn.execute(
             """
             INSERT INTO placement_decisions(
                 run_id, chunk_version_id, chosen_topic_id, status, rationale_json,
@@ -271,17 +304,56 @@ class RegistryService:
                 json.dumps(rationale, ensure_ascii=False),
                 confidence,
                 reviewer_action,
-                "system_apply",
+                reviewer_id,
+                _utc_now(),
+            ),
+        )
+        placement_decision_id = int(cur.lastrowid)
+        self.conn.execute(
+            """
+            INSERT INTO placement_decision_provenance(
+                placement_decision_id, run_id, reviewer_id, reviewer_action,
+                provenance_json, recorded_at
+            ) VALUES(?, ?, ?, ?, ?, ?)
+            """,
+            (
+                placement_decision_id,
+                self.run_id,
+                reviewer_id,
+                reviewer_action,
+                json.dumps(
+                    {
+                        "status": placement_payload.get("status") or "review",
+                        "chosen_topic_id": placement_payload.get("chosen_topic_id"),
+                        "confidence": confidence,
+                    },
+                    ensure_ascii=False,
+                ),
                 _utc_now(),
             ),
         )
         self.conn.commit()
 
-    def add_projection(self, projection_kind: str, source_ref: str, payload: dict) -> None:
+    def add_projection(
+        self,
+        projection_kind: str,
+        source_ref: str,
+        payload: dict,
+        regenerated_by: str = "system_apply",
+    ) -> None:
         payload_json = json.dumps(payload, ensure_ascii=False, sort_keys=True)
         source_hash = hashlib.sha256(payload_json.encode("utf-8")).hexdigest()
         deterministic_key = f"{projection_kind}:{source_hash}"
-        self.conn.execute(
+        existing = self.conn.execute(
+            """
+            SELECT projection_id, source_hash FROM projections
+            WHERE run_id = ? AND projection_kind = ?
+            ORDER BY projection_id DESC
+            LIMIT 1
+            """,
+            (self.run_id, projection_kind),
+        ).fetchone()
+        cur = self.conn.execute(
             """
             INSERT INTO projections(
                 run_id, projection_kind, source_ref, source_hash, deterministic_key,
@@ -302,4 +374,61 @@ class RegistryService:
                 payload_json,
             ),
         )
+
+        projection_id = int(cur.lastrowid)
+        if projection_id == 0:
+            row = self.conn.execute(
+                """
+                SELECT projection_id FROM projections
+                WHERE run_id = ? AND projection_kind = ? AND deterministic_key = ?
+                """,
+                (self.run_id, projection_kind, deterministic_key),
+            ).fetchone()
+            projection_id = int(row[0])
+
+        if existing is not None and str(existing["source_hash"]) != source_hash:
+            self.conn.execute(
+                """
+                INSERT INTO projection_regenerations(
+                    projection_id, run_id, regeneration_reason, regenerated_by,
+                    metadata_json, regenerated_at
+                ) VALUES(?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    projection_id,
+                    self.run_id,
+                    "source_hash_changed",
+                    regenerated_by,
+                    json.dumps(
+                        {
+                            "previous_source_hash": existing["source_hash"],
+                            "new_source_hash": source_hash,
+                            "projection_kind": projection_kind,
+                            "source_ref": source_ref,
+                        },
+                        ensure_ascii=False,
+                    ),
+                    _utc_now(),
+                ),
+            )
         self.conn.commit()
+
+    def record_chunk_placement(
+        self,
+        chunk_key: str,
+        approved_item: dict,
+        chunk_features: dict,
+        placement_payload: dict,
+        reviewer_id: str = "system_apply",
+    ) -> int:
+        chunk_version_id = self.add_chunk_version(
+            chunk_key=chunk_key,
+            approved_item=approved_item,
+            chunk_features=chunk_features,
+        )
+        self.add_placement_decision(
+            chunk_version_id=chunk_version_id,
+            placement_payload=placement_payload,
+            reviewer_id=reviewer_id,
+        )
+        return chunk_version_id
