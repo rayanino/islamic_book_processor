@@ -1,0 +1,1 @@
+"""Islamic Book Processor package."""
