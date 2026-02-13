@@ -13,6 +13,7 @@ from ibp.headings.candidates import candidates_jsonable, extract_layer_a_candida
 from ibp.headings.scoring import score_candidates, scored_jsonable
 from ibp.ingest.manifest import build_book_manifest, manifest_as_jsonable, sorted_source_files
 from ibp.logging import configure_run_logger
+from ibp.placement.engine import decision_as_jsonable, place_chunk
 from ibp.run_context import RunContext
 
 
@@ -65,6 +66,20 @@ def _approved_items(plan_payload: dict) -> list[dict]:
     boundaries = plan_payload.get("boundaries")
     if isinstance(boundaries, list):
         return boundaries
+    return []
+
+
+def _load_topic_registry(artifacts_dir: Path) -> list[dict]:
+    for path in (
+        artifacts_dir / "topic_registry.json",
+        artifacts_dir / "registry" / "topics.json",
+    ):
+        if not path.exists():
+            continue
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        topics = payload.get("topics") if isinstance(payload, dict) else None
+        if isinstance(topics, list):
+            return topics
     return []
 
 
@@ -219,8 +234,10 @@ def cmd_apply(args: argparse.Namespace) -> int:
 
     markdown_lines = derived_book.read_text(encoding="utf-8").splitlines()
     strict_headings = _split_by_strict_anchors(markdown_lines)
+    topics = _load_topic_registry(artifacts_dir)
 
     mismatches: list[dict] = []
+    matched_heading_indexes: list[int] = []
     next_cursor = 0
     for idx, approved in enumerate(approved_items):
         expected_heading = (approved.get("heading") or approved.get("title") or approved.get("text") or "").strip()
@@ -249,6 +266,7 @@ def cmd_apply(args: argparse.Namespace) -> int:
             )
             continue
         next_cursor = match_index + 1
+        matched_heading_indexes.append(match_index)
 
     if mismatches:
         _write_json(
@@ -264,6 +282,70 @@ def cmd_apply(args: argparse.Namespace) -> int:
         )
         return 1
 
+    review_items: list[dict] = []
+    placement_items: list[dict] = []
+    for idx, approved in enumerate(approved_items):
+        heading_index = matched_heading_indexes[idx]
+        heading = strict_headings[heading_index]
+        heading_line_index = heading["line_number"] - 1
+
+        if idx + 1 < len(matched_heading_indexes):
+            next_heading_line_index = strict_headings[matched_heading_indexes[idx + 1]]["line_number"] - 1
+        else:
+            next_heading_line_index = len(markdown_lines)
+
+        body_lines = markdown_lines[heading_line_index + 1:next_heading_line_index]
+        chunk_body = "\n".join(line for line in body_lines if line.strip())
+        decision = place_chunk(
+            chunk_heading=heading.get("heading", ""),
+            chunk_body=chunk_body,
+            topics=topics,
+        )
+        jsonable = decision_as_jsonable(decision)
+        placement_payload = {
+            "approved_item_index": idx,
+            "approved_item": approved,
+            "chunk_features": {
+                "heading": heading.get("heading", ""),
+                "body_excerpt": chunk_body[:500],
+            },
+            **jsonable,
+        }
+        placement_items.append(placement_payload)
+
+        if decision.status == "review":
+            review_items.append(
+                {
+                    "kind": "topic_placement",
+                    "approved_item_index": idx,
+                    "machine_reasons": jsonable["reasons"],
+                    "candidate_alternatives": jsonable["candidate_alternatives"],
+                    "chunk_features": placement_payload["chunk_features"],
+                    "approved_item": approved,
+                }
+            )
+
+    _write_json(
+        artifacts_dir / "topic_placements.applied.json",
+        {
+            "book_id": args.book_id,
+            "run_id": args.run_id,
+            "topics_source": "artifacts/topic_registry.json#topics",
+            "items": placement_items,
+        },
+    )
+
+    if review_items:
+        _write_json(
+            run_dir / "_REVIEW" / "topic_placements.review.json",
+            {
+                "book_id": args.book_id,
+                "run_id": args.run_id,
+                "status": "review_required",
+                "items": review_items,
+            },
+        )
+
     _write_json(
         artifacts_dir / "chunking.applied.json",
         {
@@ -272,6 +354,11 @@ def cmd_apply(args: argparse.Namespace) -> int:
             "status": "applied",
             "boundaries_source": "artifacts/chunk_plan.approved.json#items",
             "applied_items": approved_items,
+            "topic_placement": {
+                "status": "review_required" if review_items else "assigned",
+                "review_count": len(review_items),
+                "placements_source": "artifacts/topic_placements.applied.json#items",
+            },
         },
     )
     return 0
