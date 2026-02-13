@@ -15,6 +15,9 @@ class PlacementCandidate:
     score: float
     heading_similarity: float
     body_similarity: float
+    title_similarity: float
+    exemplar_similarity: float
+    evidence: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -26,10 +29,14 @@ class PlacementDecision:
     candidates: tuple[PlacementCandidate, ...]
 
 
+@dataclass(frozen=True)
+class _ExemplarFeatures:
+    heading_tokens: set[str]
+    body_tokens: set[str]
+
 
 def _tokenize(text: str) -> set[str]:
     return {tok for tok in _TOKEN_RE.findall((text or "").lower()) if tok}
-
 
 
 def _jaccard(left: set[str], right: set[str]) -> float:
@@ -40,7 +47,6 @@ def _jaccard(left: set[str], right: set[str]) -> float:
     if not union:
         return 0.0
     return len(inter) / len(union)
-
 
 
 def _iter_exemplars(topic: dict[str, Any]) -> list[dict[str, str]]:
@@ -55,6 +61,36 @@ def _iter_exemplars(topic: dict[str, Any]) -> list[dict[str, str]]:
     return [{"heading": topic.get("title", ""), "body": topic.get("description", "")}]
 
 
+def _topic_title_text(topic: dict[str, Any]) -> str:
+    title_parts: list[str] = []
+    for key in ("title", "display_title_ar", "display_title_en"):
+        value = topic.get(key)
+        if isinstance(value, str) and value.strip():
+            title_parts.append(value)
+
+    aliases = topic.get("aliases")
+    if isinstance(aliases, list):
+        title_parts.extend(str(alias) for alias in aliases if isinstance(alias, str) and alias.strip())
+    return " ".join(title_parts)
+
+
+def _build_topic_lexicon(topic: dict[str, Any]) -> tuple[set[str], list[_ExemplarFeatures]]:
+    title_tokens = _tokenize(_topic_title_text(topic))
+    exemplar_features: list[_ExemplarFeatures] = []
+
+    for exemplar in _iter_exemplars(topic):
+        heading_tokens = _tokenize(exemplar.get("heading", ""))
+        body_tokens = _tokenize(exemplar.get("body", ""))
+        title_tokens.update(heading_tokens)
+        exemplar_features.append(_ExemplarFeatures(heading_tokens=heading_tokens, body_tokens=body_tokens))
+
+    return title_tokens, exemplar_features
+
+
+def _top_overlaps(chunk_tokens: set[str], topic_tokens: set[str], *, limit: int = 5) -> tuple[str, ...]:
+    overlap = sorted(chunk_tokens.intersection(topic_tokens))
+    return tuple(overlap[:limit])
+
 
 def _score_topic(chunk_heading: str, chunk_body: str, topic: dict[str, Any]) -> PlacementCandidate | None:
     topic_id = topic.get("topic_id")
@@ -64,22 +100,41 @@ def _score_topic(chunk_heading: str, chunk_body: str, topic: dict[str, Any]) -> 
     heading_tokens = _tokenize(chunk_heading)
     body_tokens = _tokenize(chunk_body)
 
+    title_tokens, exemplar_features = _build_topic_lexicon(topic)
+    title_similarity = _jaccard(heading_tokens, title_tokens)
+
     best_heading = 0.0
     best_body = 0.0
-    for exemplar in _iter_exemplars(topic):
-        exemplar_heading = f"{topic.get('title', '')} {exemplar.get('heading', '')}"
-        exemplar_body = exemplar.get("body", "")
-        best_heading = max(best_heading, _jaccard(heading_tokens, _tokenize(exemplar_heading)))
-        best_body = max(best_body, _jaccard(body_tokens, _tokenize(exemplar_body)))
+    best_exemplar = 0.0
 
-    score = (0.65 * best_heading) + (0.35 * best_body)
+    for exemplar in exemplar_features:
+        heading_similarity = _jaccard(heading_tokens, exemplar.heading_tokens)
+        body_similarity = _jaccard(body_tokens, exemplar.body_tokens)
+        combined = (0.5 * heading_similarity) + (0.5 * body_similarity)
+        best_heading = max(best_heading, heading_similarity)
+        best_body = max(best_body, body_similarity)
+        best_exemplar = max(best_exemplar, combined)
+
+    score = (0.45 * best_heading) + (0.25 * best_body) + (0.2 * title_similarity) + (0.1 * best_exemplar)
+
+    heading_overlap = _top_overlaps(heading_tokens, title_tokens)
+    body_overlap = _top_overlaps(body_tokens, set().union(*(e.body_tokens for e in exemplar_features)))
+    evidence = (
+        f"heading_overlap={','.join(heading_overlap) or 'none'}",
+        f"body_overlap={','.join(body_overlap) or 'none'}",
+        f"title_similarity={title_similarity:.3f}",
+        f"exemplar_similarity={best_exemplar:.3f}",
+    )
+
     return PlacementCandidate(
         topic_id=topic_id,
         score=score,
         heading_similarity=best_heading,
         body_similarity=best_body,
+        title_similarity=title_similarity,
+        exemplar_similarity=best_exemplar,
+        evidence=evidence,
     )
-
 
 
 def place_chunk(
@@ -140,7 +195,6 @@ def place_chunk(
     )
 
 
-
 def decision_as_jsonable(decision: PlacementDecision) -> dict[str, Any]:
     return {
         "status": decision.status,
@@ -153,6 +207,9 @@ def decision_as_jsonable(decision: PlacementDecision) -> dict[str, Any]:
                 "score": round(c.score, 6),
                 "heading_similarity": round(c.heading_similarity, 6),
                 "body_similarity": round(c.body_similarity, 6),
+                "title_similarity": round(c.title_similarity, 6),
+                "exemplar_similarity": round(c.exemplar_similarity, 6),
+                "evidence": list(c.evidence),
             }
             for c in decision.candidates
         ],
