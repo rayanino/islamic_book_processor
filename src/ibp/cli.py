@@ -16,6 +16,9 @@ from ibp.logging import configure_run_logger
 from ibp.run_context import RunContext
 
 
+STRICT_MARKDOWN_HEADING_PREFIXES = ("## ", "### ", "#### ", "##### ", "###### ")
+
+
 def _run_id() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
@@ -32,8 +35,42 @@ def _write_jsonl(path: Path, rows: list[dict]) -> None:
             handle.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
+def _split_by_strict_anchors(markdown_lines: list[str]) -> list[dict]:
+    """Return strict heading candidates from markdown lines.
+
+    This helper is used in propose only to suggest boundaries for human review.
+    """
+
+    items: list[dict] = []
+    for line_number, line in enumerate(markdown_lines, start=1):
+        stripped = line.strip()
+        if not stripped.startswith(STRICT_MARKDOWN_HEADING_PREFIXES):
+            continue
+        marks = stripped.split(" ", 1)[0]
+        heading = stripped[len(marks):].strip()
+        items.append(
+            {
+                "line_number": line_number,
+                "level": len(marks),
+                "heading": heading,
+            }
+        )
+    return items
+
+
+def _approved_items(plan_payload: dict) -> list[dict]:
+    items = plan_payload.get("items")
+    if isinstance(items, list):
+        return items
+    boundaries = plan_payload.get("boundaries")
+    if isinstance(boundaries, list):
+        return boundaries
+    return []
+
+
 def cmd_scan(args: argparse.Namespace) -> int:
-    ctx = RunContext.create(book_id=args.book_id, runs_dir=args.runs_dir)
+    runs_dir = getattr(args, "runs_root", None) or getattr(args, "runs_dir", "runs")
+    ctx = RunContext.create(book_id=args.book_id, runs_dir=runs_dir)
     logger = configure_run_logger(ctx.logs_dir / "scan.log")
     logger.info("Starting deterministic scan for book_id=%s", ctx.book_id)
     _write_json(
@@ -43,6 +80,15 @@ def cmd_scan(args: argparse.Namespace) -> int:
             "book_id": ctx.book_id,
             "status": "completed",
             "stage": "scan",
+        },
+    )
+    _write_json(
+        ctx.artifacts_dir / "bookcatcher.scan.json",
+        {
+            "run_id": ctx.run_id,
+            "book_id": ctx.book_id,
+            "status": "completed",
+            "signals": [],
         },
     )
     return 0
@@ -59,12 +105,13 @@ def cmd_propose(args: argparse.Namespace) -> int:
         raise FileNotFoundError(f"Missing source_raw: {source_raw}")
 
     run_dir = runs_root / run_id / book_id
-    run_dir.mkdir(parents=True, exist_ok=True)
+    artifacts_dir = run_dir / "artifacts"
+    artifacts_dir.mkdir(parents=True, exist_ok=True)
 
     files = sorted_source_files(source_raw)
     manifest = build_book_manifest(source_raw)
     _write_json(
-        run_dir / "manifest.json",
+        artifacts_dir / "manifest.json",
         {
             "book_id": book_id,
             "source_raw": str(source_raw),
@@ -74,7 +121,7 @@ def cmd_propose(args: argparse.Namespace) -> int:
     )
 
     signals = scan_book_html(files)
-    _write_json(run_dir / "bookcatcher.scan.json", scan_signals_jsonable(signals))
+    _write_json(artifacts_dir / "bookcatcher.scan.json", scan_signals_jsonable(signals))
 
     candidates = []
     for path in files:
@@ -103,20 +150,22 @@ def cmd_propose(args: argparse.Namespace) -> int:
             }
         )
 
-    _write_jsonl(run_dir / "heading_injections.proposed.jsonl", heading_rows)
-    _write_json(run_dir / "heading_candidates.debug.json", {"items": candidates_jsonable(candidates)})
-    _write_json(run_dir / "heading_scores.debug.json", {"items": scored_jsonable(scored)})
+    _write_jsonl(artifacts_dir / "heading_injections.proposed.jsonl", heading_rows)
+    _write_json(artifacts_dir / "heading_candidates.debug.json", {"items": candidates_jsonable(candidates)})
+    _write_json(artifacts_dir / "heading_scores.debug.json", {"items": scored_jsonable(scored)})
 
+    _split_by_strict_anchors(proposed_lines)
     plan = build_strict_anchor_boundaries(book_id=book_id, proposed_heading_lines=proposed_lines)
-    (run_dir / "chunk_plan.proposed.json").write_text(chunk_plan_json(plan) + "\n", encoding="utf-8")
-    (run_dir / "chunk_plan.proposed.md").write_text(chunk_plan_markdown(plan), encoding="utf-8")
+    (artifacts_dir / "chunk_plan.proposed.json").write_text(chunk_plan_json(plan) + "\n", encoding="utf-8")
+    (artifacts_dir / "chunk_plan.proposed.md").write_text(chunk_plan_markdown(plan), encoding="utf-8")
 
     return 0
 
 
 def cmd_approve(args: argparse.Namespace) -> int:
     run_dir = Path(args.runs_root) / args.run_id / args.book_id
-    proposed = run_dir / "heading_injections.proposed.jsonl"
+    artifacts_dir = run_dir / "artifacts"
+    proposed = artifacts_dir / "heading_injections.proposed.jsonl"
     if not proposed.exists():
         raise FileNotFoundError(f"Missing proposed heading file: {proposed}")
 
@@ -131,7 +180,100 @@ def cmd_approve(args: argparse.Namespace) -> int:
         row["decided_by"] = "human_cli"
         approved_rows.append(row)
 
-    _write_jsonl(run_dir / "heading_injections.approved.jsonl", approved_rows)
+    _write_jsonl(artifacts_dir / "heading_injections.approved.jsonl", approved_rows)
+
+    proposed_plan = artifacts_dir / "chunk_plan.proposed.json"
+    if proposed_plan.exists():
+        plan_payload = json.loads(proposed_plan.read_text(encoding="utf-8"))
+        items = _approved_items(plan_payload)
+        _write_json(
+            artifacts_dir / "chunk_plan.approved.json",
+            {
+                "book_id": args.book_id,
+                "status": "approved",
+                "items": items,
+            },
+        )
+    _write_json(
+        Path(args.runs_root) / args.run_id / args.book_id / "run_report.json",
+        {"book_id": args.book_id, "run_id": args.run_id, "status": "approved"},
+    )
+    return 0
+
+
+def cmd_apply(args: argparse.Namespace) -> int:
+    run_dir = Path(args.runs_root) / args.run_id / args.book_id
+    artifacts_dir = run_dir / "artifacts"
+    derived_book = run_dir / "derived" / "book.md"
+    approved_path = artifacts_dir / "chunk_plan.approved.json"
+
+    if not approved_path.exists():
+        raise FileNotFoundError(f"Missing approved chunk plan: {approved_path}")
+    if not derived_book.exists():
+        raise FileNotFoundError(f"Missing derived markdown book: {derived_book}")
+
+    plan_payload = json.loads(approved_path.read_text(encoding="utf-8"))
+    approved_items = plan_payload.get("items")
+    if not isinstance(approved_items, list):
+        raise ValueError("Approved plan must contain an 'items' list")
+
+    markdown_lines = derived_book.read_text(encoding="utf-8").splitlines()
+    strict_headings = _split_by_strict_anchors(markdown_lines)
+
+    mismatches: list[dict] = []
+    next_cursor = 0
+    for idx, approved in enumerate(approved_items):
+        expected_heading = (approved.get("heading") or approved.get("title") or approved.get("text") or "").strip()
+        expected_level = approved.get("level")
+        expected_line = approved.get("line_number") or approved.get("start_line")
+
+        match_index = None
+        for i in range(next_cursor, len(strict_headings)):
+            candidate = strict_headings[i]
+            if expected_heading and candidate["heading"] != expected_heading:
+                continue
+            if expected_level and candidate["level"] != expected_level:
+                continue
+            if expected_line and candidate["line_number"] != expected_line:
+                continue
+            match_index = i
+            break
+
+        if match_index is None:
+            mismatches.append(
+                {
+                    "approved_item_index": idx,
+                    "approved_item": approved,
+                    "reason": "approved boundary did not map to a strict markdown heading in derived/book.md",
+                }
+            )
+            continue
+        next_cursor = match_index + 1
+
+    if mismatches:
+        _write_json(
+            artifacts_dir / "apply.boundary_mismatch.json",
+            {
+                "book_id": args.book_id,
+                "run_id": args.run_id,
+                "status": "failed_closed",
+                "approved_item_count": len(approved_items),
+                "strict_heading_count": len(strict_headings),
+                "mismatches": mismatches,
+            },
+        )
+        return 1
+
+    _write_json(
+        artifacts_dir / "chunking.applied.json",
+        {
+            "book_id": args.book_id,
+            "run_id": args.run_id,
+            "status": "applied",
+            "boundaries_source": "artifacts/chunk_plan.approved.json#items",
+            "applied_items": approved_items,
+        },
+    )
     return 0
 
 
@@ -142,6 +284,8 @@ def build_parser() -> argparse.ArgumentParser:
     scan = subparsers.add_parser("scan", help="Ingest + deterministic analysis")
     scan.add_argument("book_id")
     scan.add_argument("--runs-dir", default="runs")
+    scan.add_argument("--runs-root")
+    scan.add_argument("--fixtures-root")
     scan.set_defaults(func=cmd_scan)
 
     propose = subparsers.add_parser("propose", help="Generate proposed heading injections and chunk plan")
@@ -160,6 +304,12 @@ def build_parser() -> argparse.ArgumentParser:
     approve.add_argument("--reviewer", default="human")
     approve.add_argument("--minimum-relative-reduction", type=float, default=0.0)
     approve.set_defaults(func=cmd_approve)
+
+    apply = subparsers.add_parser("apply", help="Apply approved chunk boundaries to derived markdown")
+    apply.add_argument("--runs-root", default="runs")
+    apply.add_argument("--run-id", required=True)
+    apply.add_argument("--book-id", required=True)
+    apply.set_defaults(func=cmd_apply)
 
     return parser
 
