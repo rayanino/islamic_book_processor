@@ -34,6 +34,7 @@ def test_apply_uses_approved_items_and_writes_applied_artifact(tmp_path):
     payload = json.loads((artifacts / "chunking.applied.json").read_text(encoding="utf-8"))
     assert payload["boundaries_source"] == "artifacts/chunk_plan.approved.json#items"
     assert [item["heading"] for item in payload["applied_items"]] == ["Intro", "Detail"]
+    assert (artifacts / "topic_placements.proposed.json").exists()
 
 
 def test_apply_fails_closed_and_writes_mismatch_artifact(tmp_path):
@@ -82,6 +83,9 @@ def test_apply_routes_low_confidence_placements_to_review(tmp_path):
     assert review["status"] == "review_required"
     assert review["items"][0]["machine_reasons"] == ["confidence_below_threshold"]
     assert review["items"][0]["candidate_alternatives"][0]["topic_id"] == "topic_alpha"
+
+    proposed = json.loads((artifacts / "topic_placements.proposed.json").read_text(encoding="utf-8"))
+    assert proposed["items"][0]["review_required"] is True
 
 
 def test_apply_uses_registry_topic_id_for_high_confidence_placement(tmp_path):
