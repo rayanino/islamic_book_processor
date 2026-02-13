@@ -8,6 +8,19 @@ version = "0.1.0"
 description = "Islamic Book Processor (IBP) deterministic scaffold"
 requires-python = ">=3.10"
 dependencies = []
+name = "ibp"
+version = "0.1.0"
+description = "Islamic Book Processor CLI"
+requires-python = ">=3.10"
+dependencies = []
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "islamic-book-processor"
+version = "0.1.0"
+description = "High-assurance review-gated processing for Islamic books"
+requires-python = ">=3.11"
 
 [project.scripts]
 ibp = "ibp.cli:main"
@@ -17,3 +30,7 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+addopts = "-q"
