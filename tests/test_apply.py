@@ -35,6 +35,8 @@ def test_apply_uses_approved_items_and_writes_applied_artifact(tmp_path):
     assert payload["boundaries_source"] == "artifacts/chunk_plan.approved.json#items"
     assert [item["heading"] for item in payload["applied_items"]] == ["Intro", "Detail"]
     assert (artifacts / "topic_placements.proposed.json").exists()
+    proposal_metrics = json.loads((artifacts / "proposal.metrics.json").read_text(encoding="utf-8"))
+    assert proposal_metrics["measurement_method"]["approved_path"].endswith("derived/book.md")
 
 
 def test_apply_fails_closed_and_writes_mismatch_artifact(tmp_path):
