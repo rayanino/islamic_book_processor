@@ -43,6 +43,10 @@ def test_approve_outputs_files(tmp_path, monkeypatch):
     monkeypatch.setattr("sys.argv", args)
     assert main() == 0
 
+    derived = run_root / "T1" / "BK001_shadha_al_urf" / "derived" / "book.md"
+    derived.parent.mkdir(parents=True, exist_ok=True)
+    derived.write_text("# Book\n\n## Intro\ntext\n", encoding="utf-8")
+
     approve_args = [
         "ibp",
         "approve",
@@ -53,6 +57,8 @@ def test_approve_outputs_files(tmp_path, monkeypatch):
         "--book-id",
         "BK001_shadha_al_urf",
         "--approve-all",
+        "--mode",
+        "development",
     ]
     monkeypatch.setattr("sys.argv", approve_args)
     rc = main()

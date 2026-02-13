@@ -14,6 +14,7 @@ from ibp.headings.scoring import score_candidates, scored_jsonable
 from ibp.ingest.manifest import build_book_manifest, manifest_as_jsonable, sorted_source_files
 from ibp.logging import configure_run_logger
 from ibp.placement.engine import decision_as_jsonable, place_chunk
+from ibp.qa import GuardrailViolationError, write_run_report
 from ibp.run_context import RunContext
 
 
@@ -81,6 +82,69 @@ def _load_topic_registry(artifacts_dir: Path) -> list[dict]:
         if isinstance(topics, list):
             return topics
     return []
+
+
+def _read_json(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    return payload if isinstance(payload, dict) else {}
+
+
+def _measure_anchor_miss_after(approved_items: list[dict], markdown_lines: list[str]) -> tuple[int, int]:
+    strict_headings = _split_by_strict_anchors(markdown_lines)
+    before = len(approved_items)
+    misses = 0
+    next_cursor = 0
+
+    for approved in approved_items:
+        expected_heading = (approved.get("heading") or approved.get("title") or approved.get("text") or "").strip()
+        expected_level = approved.get("level")
+        expected_line = approved.get("line_number") or approved.get("start_line")
+
+        matched = False
+        for idx in range(next_cursor, len(strict_headings)):
+            candidate = strict_headings[idx]
+            if expected_heading and candidate["heading"] != expected_heading:
+                continue
+            if expected_level and candidate["level"] != expected_level:
+                continue
+            if expected_line and candidate["line_number"] != expected_line:
+                continue
+            matched = True
+            next_cursor = idx + 1
+            break
+
+        if not matched:
+            misses += 1
+
+    return before, misses
+
+
+def _write_run_state(run_dir: Path, *, status: str, stage: str, failure_reasons: list[str] | None = None) -> None:
+    payload = _read_json(run_dir / "run_state.json")
+    payload.update(
+        {
+            "status": status,
+            "stage": stage,
+            "failure_reasons": failure_reasons or [],
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+    _write_json(run_dir / "run_state.json", payload)
+
+
+def _write_run_report_status(run_dir: Path, *, book_id: str, run_id: str, status: str, failure_reasons: list[str]) -> None:
+    payload = _read_json(run_dir / "run_report.json")
+    payload.update(
+        {
+            "book_id": book_id,
+            "run_id": run_id,
+            "status": status,
+            "failure_reasons": failure_reasons,
+        }
+    )
+    _write_json(run_dir / "run_report.json", payload)
 
 
 def cmd_scan(args: argparse.Namespace) -> int:
@@ -198,9 +262,50 @@ def cmd_approve(args: argparse.Namespace) -> int:
     _write_jsonl(artifacts_dir / "heading_injections.approved.jsonl", approved_rows)
 
     proposed_plan = artifacts_dir / "chunk_plan.proposed.json"
+    plan_payload = _read_json(proposed_plan)
+    items = _approved_items(plan_payload)
+
+    derived_book = run_dir / "derived" / "book.md"
+    if not derived_book.exists():
+        failure_reasons = [f"Missing derived markdown book: {derived_book}"]
+        _write_run_report_status(
+            run_dir,
+            book_id=args.book_id,
+            run_id=args.run_id,
+            status="failed",
+            failure_reasons=failure_reasons,
+        )
+        _write_run_state(run_dir, status="FAILED", stage="approve", failure_reasons=failure_reasons)
+        return 1
+
+    before, after = _measure_anchor_miss_after(items, derived_book.read_text(encoding="utf-8").splitlines())
+
+    fail_on_guardrails = args.mode == "production"
+    try:
+        write_run_report(
+            run_id=args.run_id,
+            book_id=args.book_id,
+            anchor_miss_before=before,
+            anchor_miss_after=after,
+            decision_rows=approved_rows,
+            output_root=Path(args.runs_root),
+            minimum_relative_reduction=args.minimum_relative_reduction,
+            fail_on_guardrails=fail_on_guardrails,
+        )
+    except GuardrailViolationError:
+        report_payload = _read_json(run_dir / "run_report.json")
+        failure_reasons = report_payload.get("guardrail_violations") or ["Mandatory guardrails violated"]
+        _write_run_report_status(
+            run_dir,
+            book_id=args.book_id,
+            run_id=args.run_id,
+            status="failed",
+            failure_reasons=failure_reasons,
+        )
+        _write_run_state(run_dir, status="FAILED", stage="approve", failure_reasons=failure_reasons)
+        return 1
+
     if proposed_plan.exists():
-        plan_payload = json.loads(proposed_plan.read_text(encoding="utf-8"))
-        items = _approved_items(plan_payload)
         _write_json(
             artifacts_dir / "chunk_plan.approved.json",
             {
@@ -209,10 +314,14 @@ def cmd_approve(args: argparse.Namespace) -> int:
                 "items": items,
             },
         )
-    _write_json(
-        Path(args.runs_root) / args.run_id / args.book_id / "run_report.json",
-        {"book_id": args.book_id, "run_id": args.run_id, "status": "approved"},
+    _write_run_report_status(
+        run_dir,
+        book_id=args.book_id,
+        run_id=args.run_id,
+        status="approved",
+        failure_reasons=[],
     )
+    _write_run_state(run_dir, status="APPROVED", stage="approve", failure_reasons=[])
     return 0
 
 
@@ -269,6 +378,9 @@ def cmd_apply(args: argparse.Namespace) -> int:
         matched_heading_indexes.append(match_index)
 
     if mismatches:
+        failure_reasons = [
+            "approved boundary did not map to a strict markdown heading in derived/book.md",
+        ]
         _write_json(
             artifacts_dir / "apply.boundary_mismatch.json",
             {
@@ -280,6 +392,14 @@ def cmd_apply(args: argparse.Namespace) -> int:
                 "mismatches": mismatches,
             },
         )
+        _write_run_report_status(
+            run_dir,
+            book_id=args.book_id,
+            run_id=args.run_id,
+            status="failed",
+            failure_reasons=failure_reasons,
+        )
+        _write_run_state(run_dir, status="FAILED", stage="apply", failure_reasons=failure_reasons)
         return 1
 
     review_items: list[dict] = []
@@ -361,6 +481,48 @@ def cmd_apply(args: argparse.Namespace) -> int:
             },
         },
     )
+
+    approved_rows: list[dict] = []
+    approved_rows_path = artifacts_dir / "heading_injections.approved.jsonl"
+    if approved_rows_path.exists():
+        for line in approved_rows_path.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                approved_rows.append(json.loads(line))
+
+    before, after = _measure_anchor_miss_after(approved_items, markdown_lines)
+    fail_on_guardrails = args.mode == "production"
+    try:
+        write_run_report(
+            run_id=args.run_id,
+            book_id=args.book_id,
+            anchor_miss_before=before,
+            anchor_miss_after=after,
+            decision_rows=approved_rows,
+            output_root=Path(args.runs_root),
+            minimum_relative_reduction=args.minimum_relative_reduction,
+            fail_on_guardrails=fail_on_guardrails,
+        )
+    except GuardrailViolationError:
+        report_payload = _read_json(run_dir / "run_report.json")
+        failure_reasons = report_payload.get("guardrail_violations") or ["Mandatory guardrails violated"]
+        _write_run_report_status(
+            run_dir,
+            book_id=args.book_id,
+            run_id=args.run_id,
+            status="failed",
+            failure_reasons=failure_reasons,
+        )
+        _write_run_state(run_dir, status="FAILED", stage="apply", failure_reasons=failure_reasons)
+        return 1
+
+    _write_run_report_status(
+        run_dir,
+        book_id=args.book_id,
+        run_id=args.run_id,
+        status="applied",
+        failure_reasons=[],
+    )
+    _write_run_state(run_dir, status="APPLIED", stage="apply", failure_reasons=[])
     return 0
 
 
@@ -390,12 +552,15 @@ def build_parser() -> argparse.ArgumentParser:
     approve.add_argument("--reject-all", action="store_true")
     approve.add_argument("--reviewer", default="human")
     approve.add_argument("--minimum-relative-reduction", type=float, default=0.0)
+    approve.add_argument("--mode", choices=["production", "development"], default="production")
     approve.set_defaults(func=cmd_approve)
 
     apply = subparsers.add_parser("apply", help="Apply approved chunk boundaries to derived markdown")
     apply.add_argument("--runs-root", default="runs")
     apply.add_argument("--run-id", required=True)
     apply.add_argument("--book-id", required=True)
+    apply.add_argument("--minimum-relative-reduction", type=float, default=0.0)
+    apply.add_argument("--mode", choices=["production", "development"], default="production")
     apply.set_defaults(func=cmd_apply)
 
     return parser
