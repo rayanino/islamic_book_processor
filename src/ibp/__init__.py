@@ -1,3 +1,5 @@
+"""Islamic Book Processor."""
+
 """Islamic Book Processor package."""
 
 """Islamic Book Processor."""
