@@ -1,0 +1,55 @@
+{
+  "created_at": "2026-02-10T18:40:19.492589+00:00",
+  "candidates": 350,
+  "kind_distribution": {
+    "body": 192,
+    "metadata": 52,
+    "footnote": 52,
+    "pagehead": 54
+  },
+  "books_in_sample": 37,
+  "unique_signatures": 19,
+  "signature_top10": [
+    [
+      "body|p|len:21-35|kw:none|f:font|cls:",
+      50
+    ],
+    [
+      "body|p|len:11-20|kw:none|f:none|cls:",
+      41
+    ],
+    [
+      "body|p|len:11-20|kw:none|f:font|cls:",
+      31
+    ],
+    [
+      "body|span|len:21-35|kw:none|f:none|cls:title",
+      31
+    ],
+    [
+      "footnote|span|len:11-20|kw:none|f:none|cls:footnote",
+      31
+    ],
+    [
+      "pagehead|div|len:36-50|kw:none|f:none|cls:",
+      28
+    ],
+    [
+      "body|p|len:21-35|kw:none|f:none|cls:",
+      27
+    ],
+    [
+      "metadata|p|len:21-35|kw:none|f:font|cls:",
+      19
+    ],
+    [
+      "metadata|p|len:36-50|kw:none|f:font|cls:",
+      17
+    ],
+    [
+      "footnote|span|len:00-10|kw:none|f:none|cls:footnote",
+      17
+    ]
+  ],
+  "raw_candidates": 3308
+}

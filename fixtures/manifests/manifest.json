@@ -1,0 +1,588 @@
+{
+  "roots": [
+    "/mnt/data/ibp_repo_seed"
+  ],
+  "file_count": 116,
+  "entries": [
+    {
+      "path": ".env.example",
+      "size": 140,
+      "sha256": "ce99a44ead87618bd64d8689c4bba19b0cb6759c2ff1c9cf08088fb193fe929e"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "size": 569,
+      "sha256": "f12768c79013a4821ab506511624cb0dc9949edd807587cccf9aecc0f55f0855"
+    },
+    {
+      "path": ".gitignore",
+      "size": 163,
+      "sha256": "12a9273205bb69edaee411281739e6a8082d427f9dc2bb561abe43a6c40a0c08"
+    },
+    {
+      "path": "DEVIN_PROMPT.md",
+      "size": 1808,
+      "sha256": "8f48e980c73fed8f029ee2d740bba6fa2e2e7410ac004fc8d36d0235d1aa10e6"
+    },
+    {
+      "path": "docs/00_CONTEXT.md",
+      "size": 1002,
+      "sha256": "8d7528944206324953ec67c3456f6364f510b92b7eda300446b2eb46c5b802ff"
+    },
+    {
+      "path": "docs/01_REQUIREMENTS.md",
+      "size": 1530,
+      "sha256": "e5e3cdeacb867dadc9b8778a58039b5c8ec7bb663a38569089588c36ec2ed0a9"
+    },
+    {
+      "path": "docs/02_DATASETS.md",
+      "size": 1653,
+      "sha256": "5e5b774ca51e63bc3fbb498ff4749212ad790b39d00c44c5abf90eed5ef088d1"
+    },
+    {
+      "path": "docs/03_HEADING_ENGINE_SPEC.md",
+      "size": 2638,
+      "sha256": "2ec4fd9a66556ab8f993427f64c9c884bcd29b1c80c00cf64d6530e6ead2a2bb"
+    },
+    {
+      "path": "docs/04_ACCEPTANCE.md",
+      "size": 1513,
+      "sha256": "9592acfafdad545ccf6c0902530213a792aaaa73ac579b4ba26a39046dc4b1a9"
+    },
+    {
+      "path": "docs/05_SECURITY.md",
+      "size": 339,
+      "sha256": "00a367e03a8fa65ac0467695fbc8476274f35a6aaadc7e33f01d57593cd4f4ad"
+    },
+    {
+      "path": "fixtures/manifests/manifest.json",
+      "size": 20648,
+      "sha256": "e9e004f15f340a312f64f8e283036cf8cc90a24290dc68b271a92746520ed441"
+    },
+    {
+      "path": "fixtures/manifests/pattern_stats.json",
+      "size": 3265,
+      "sha256": "09a81fb9ed85146d0b96201927d72495b564f115800d5a5d1c9a77bfc2b340a5"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK001_shadha_al_urf/meta.json",
+      "size": 489,
+      "sha256": "ccec8e9d6462851d5e924733b909862459de223e6d59e18fef06d0414991f534"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK001_shadha_al_urf/source_raw/#U0634#U0630#U0627 #U0627#U0644#U0639#U0631#U0641 #U0641#U064a #U0641#U0646 #U0627#U0644#U0635#U0631#U0641.htm",
+      "size": 451659,
+      "sha256": "8c3fcc8e69b7b573b45be8eb3429748d6ddd43b1e6795382812dbefc5aaf1579"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK002_lisan_al_arab/meta.json",
+      "size": 470,
+      "sha256": "cb924664e2df23d720b73cd5a2c12383cb2f14c148249fa61464b488df1a3516"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK002_lisan_al_arab/source_raw/001.htm",
+      "size": 4675031,
+      "sha256": "19cbe146d1481a085bc8afa466326f1111284a0995b4c369f9538a07e70a1a45"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK002_lisan_al_arab/source_raw/002.htm",
+      "size": 3840193,
+      "sha256": "7425b6492046520ecfd116781e16c14e611fba2639074defcf77c992390dc17d"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK002_lisan_al_arab/source_raw/003.htm",
+      "size": 3356867,
+      "sha256": "14d706b3561bb9d22d3cf17c959fd93711727a5af1575edacebe421b54543677"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK002_lisan_al_arab/source_raw/004.htm",
+      "size": 4073850,
+      "sha256": "178169f6b269d0b903e73ca7f053e3e302a86da5a443e66c6d65845df0621822"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK002_lisan_al_arab/source_raw/005.htm",
+      "size": 2737731,
+      "sha256": "5c139b553795155d8a9c984932e9a6fa95cb5fa219fe30f109121aeb106ea1bf"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK002_lisan_al_arab/source_raw/006.htm",
+      "size": 2260599,
+      "sha256": "934a226bee9c4d3badc94e58af92a699a0d6f893ee2c64a8fb5e9f285d81e1de"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK002_lisan_al_arab/source_raw/007.htm",
+      "size": 2745912,
+      "sha256": "1a7028507698953cc9febff525cbb401317c460a5c49b487bc097ff4576f631c"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK002_lisan_al_arab/source_raw/008.htm",
+      "size": 2786135,
+      "sha256": "8b9aaf0796f946aec7858ff23376832a70ffaddcb5e76e18fc35800252bd4121"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK002_lisan_al_arab/source_raw/009.htm",
+      "size": 2196232,
+      "sha256": "72b49e8f17e8d39dfd174e863a7f4b8efe2ab18911eed7d1b491411cc178729e"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK002_lisan_al_arab/source_raw/010.htm",
+      "size": 3162643,
+      "sha256": "13833ee86e12368e134c3011561d2a5d41ad228f3d56bea8ec017545fe205512"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK002_lisan_al_arab/source_raw/011.htm",
+      "size": 4499816,
+      "sha256": "3070912f898bb6e35f50ea62ab2cf17bbb4a6bc59621c47652c2eb7a5bf1f93c"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK002_lisan_al_arab/source_raw/012.htm",
+      "size": 4014872,
+      "sha256": "7cdc9d7526e9703d63b1943580050226519a75f1266ac561eb53bbed612cc07f"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK002_lisan_al_arab/source_raw/013.htm",
+      "size": 3636266,
+      "sha256": "54c4aa6cc93f223bd737129cdda7d0da993fab8349cfbcc824c5584c7abb7fc4"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK002_lisan_al_arab/source_raw/014.htm",
+      "size": 3131669,
+      "sha256": "3f3ddf8291172d39951c2171b39a51fddb72e8d6bb1c8a1cb14140d20d5ed1e5"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK002_lisan_al_arab/source_raw/015.htm",
+      "size": 3130699,
+      "sha256": "b50d9cf49890b5c285505b9f3a63d89a7cf4b168755817d3ae8ab465aae7bf95"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/meta.json",
+      "size": 499,
+      "sha256": "a29d37b2c4d0cfa3948568cd7dc2ac696b7127a23e5cb67cf07ad466112e5649"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/001.htm",
+      "size": 1776394,
+      "sha256": "fcc9477f48631dfdedd5f6724428d17e08f999230a48371efb54c898d1058a81"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/002.htm",
+      "size": 1863769,
+      "sha256": "69a078af454c8446d6c0ff7d2a318cbb70a7308ba780747fda608e3a9a6ad592"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/003.htm",
+      "size": 1751387,
+      "sha256": "b36dac1791e4022e3e3be3bb804468e9db9915c8943769376893b2f277e6ea1b"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/004.htm",
+      "size": 1801454,
+      "sha256": "eb87e65dfe772c4f190cad991985f778584e772c963eac1b4f844af890b8259f"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/005.htm",
+      "size": 1819058,
+      "sha256": "a45cfe063d57c68167b4c2662db5c4289f607550901181e487e6f43423729eb9"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/006.htm",
+      "size": 1747637,
+      "sha256": "6c8bf0a117b1ba9d8fbb0724fa8f07d57006a3568063ba4a52241715e17cf979"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/007.htm",
+      "size": 1651997,
+      "sha256": "9ebf9c5fc95852f05b62dfa0f6d02930e0d84012487d982e99f4b09ac90e198e"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/008.htm",
+      "size": 1567893,
+      "sha256": "d5b0ad5bbe5f7d64bb785cc3572d489ad513882f6877069016cd8a00846631a1"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/009.htm",
+      "size": 1617305,
+      "sha256": "44fb055133ea944f2bab89e0413992480675613866fc79298d969bbd1d47cd99"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/010.htm",
+      "size": 1730778,
+      "sha256": "b3002a1970340e1416e65814f93f0b86bd8a86ba303117385ffa61c8032000e1"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/011.htm",
+      "size": 1602306,
+      "sha256": "461659e9bcc693d28afe50015aa6d8dc12a8b7211cc1d16f0b0cfa3c979145b7"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/012.htm",
+      "size": 1626123,
+      "sha256": "1414c52559f0443e2dbd5d35c520edd6a70b89af0fdd56f4d441d071feed56f8"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/013.htm",
+      "size": 1563317,
+      "sha256": "e101534bda61dea053044a63a2f4519f6e6c53b8004c70614852593b33b19be3"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/014.htm",
+      "size": 1420120,
+      "sha256": "02edec3f6d0781a4697ebed2870fa93abc13a91f20f768b226571190c7021c25"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/015.htm",
+      "size": 1604137,
+      "sha256": "10b1ed75e4e9f2900aa9950cbf6a54c186a534decbeb892b65d0bbc8c20bb095"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/016.htm",
+      "size": 1685010,
+      "sha256": "f6c70f05ed8c3d9e4fa144fdd4b957542015042735eaf42c5345bf7910f2daf3"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/017.htm",
+      "size": 1749927,
+      "sha256": "d468cebbc6fd9242ecac6842c337b1175d74b45c760f45a1e8fef8238cfcceb7"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/018.htm",
+      "size": 1493602,
+      "sha256": "4147a619b9f1da71ca48ceb609379b10bbb5cf279fb5e5e95d9ae4b6136080ae"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/019.htm",
+      "size": 1567473,
+      "sha256": "10ef6fb0f136a61631b8b32a599adb7456b783adf40d25090e48d81bd04613b7"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/020.htm",
+      "size": 1728605,
+      "sha256": "55cf45c27feea9405b219566e5b44cc987e7a09a9a5789c6a3125104c2d9297d"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/021.htm",
+      "size": 1574331,
+      "sha256": "95a094b06426cd15a1721bee1c739a2f0e79c23c4b6e897a31f6c24d1b7bb6d2"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/022.htm",
+      "size": 1709563,
+      "sha256": "7078a0258fb73fb0ecc5efb51d61b1bbe205e66002c391cfd4e2a078049372c2"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/023.htm",
+      "size": 1602311,
+      "sha256": "4e1eaaed93dcdc293fe98b10d134e930a250693e59c74f173dadb6aaf67ab7b8"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/024.htm",
+      "size": 1440525,
+      "sha256": "68414b293d9387e16153b9bf9d6363fe18193dddce3f850baeb2ece10ebea44f"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/025.htm",
+      "size": 1558778,
+      "sha256": "bfe8c3523ffb05b5e53c22927b50041ac8e2647ae59d608d069dbabffd2d4867"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/026.htm",
+      "size": 1336431,
+      "sha256": "1fe6834db6c8735afde11901a090aad923124b122d49def07ee4b3c11e0c0826"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/027.htm",
+      "size": 1456326,
+      "sha256": "d6a58ff5c2478be110d6482c7dbacab1fa77c3a8c1f9e0ef43fd767059cd409e"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/028.htm",
+      "size": 1470955,
+      "sha256": "05f3fd29fc19a66bbd52a84d1ef57cd84dd37ed36e4eed1f25ef93d982034118"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/029.htm",
+      "size": 1577444,
+      "sha256": "93f87a9bf5ebf909ba2dcfc729c9bf8cda5083e5852afa476889cef4c8993e99"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/030.htm",
+      "size": 1451401,
+      "sha256": "f2bf7deb18f6d34802fb4d266784bf7024e9c8e5b8950e0a5e9f9e05d8822521"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/031.htm",
+      "size": 1565008,
+      "sha256": "3cb9510da28732b37ce2792920e292ec772d224c6b0bf94647664b9afe79713e"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/032.htm",
+      "size": 1509672,
+      "sha256": "827b685ef0f14725ed594106a2a965d4ca1448e4c0a34b587c54462ba5a70050"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/033.htm",
+      "size": 1637321,
+      "sha256": "09496b158e657359295b8eae83f7334709e5af8f021098e254eb830033f8a849"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/034.htm",
+      "size": 1491944,
+      "sha256": "47212853698f91a538097a9f566079e9723da49e31188643103fabd07c9f9011"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/035.htm",
+      "size": 1457540,
+      "sha256": "32aa3488d6a9ffd3fd185e805c324d465359a9017f1d81082fbfc5b96e80e805"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/036.htm",
+      "size": 1485504,
+      "sha256": "d7461ffe60f60f9d87207b27bf9b8bbd3d47fab6929819269b8e7038dae1dbca"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/037.htm",
+      "size": 1446822,
+      "sha256": "dee4d8b912420f04294a1e78161c082284c7b8d73c4681c18e494e7bfc5eb403"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/038.htm",
+      "size": 1506490,
+      "sha256": "fda48615625a7b9dfb518930c210eef8e09a497799b257db0b54bbaf8bfccb86"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/039.htm",
+      "size": 1503433,
+      "sha256": "e163c3c8723626211db7a20162ff37974bb99533bef9ace9858db48f1dfba751"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK003_taj_al_arus/source_raw/040.htm",
+      "size": 1356396,
+      "sha256": "eb3272d21dc5d66e216029722167e4c6823ee20c96f75674f9b274716cbafc77"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK004_sharh_ibn_aqil/meta.json",
+      "size": 508,
+      "sha256": "c7fd476394fb7d1ceedfcd19b7be1b03f4b10970f0b09d62fbe1cabfbd29ae25"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK004_sharh_ibn_aqil/source_raw/001.htm",
+      "size": 1151587,
+      "sha256": "13f42287d1eb179d769e311193de6b000b12873160aa88e4dbb03344b6c7d6d0"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK004_sharh_ibn_aqil/source_raw/002.htm",
+      "size": 793366,
+      "sha256": "a567e3784f60703c4c2154ff59c1a6bd05213090ca6e3cfecfc0431a7ee344b0"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK004_sharh_ibn_aqil/source_raw/003.htm",
+      "size": 323392,
+      "sha256": "da847f34106b31e13c34ce9bbe3fa3f9cf9c7574380170fd808d4357f13ab030"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK004_sharh_ibn_aqil/source_raw/004.htm",
+      "size": 375840,
+      "sha256": "e9216bd2cfc5639f2ce37beab4ff9b0bf40c1c967996b196068bcc6c9ee3372c"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK005_al_muwafaqat/meta.json",
+      "size": 468,
+      "sha256": "1be9f280d5c5bb8af8e3b96a65d24a2c914af9a28001d55421abd60b3bf5dda7"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK005_al_muwafaqat/source_raw/#U0645#U0642#U062f#U0645#U0629.htm",
+      "size": 219266,
+      "sha256": "b3fb2135e2deeb987bc907df05d50d6fa28380f6841005dfc658917f3376f2e6"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK005_al_muwafaqat/source_raw/00#U0645.htm",
+      "size": 27087,
+      "sha256": "838391d52ad12eb4ca9b465253888c9386380d4d4853622bebfc06b5e9cfac7a"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK005_al_muwafaqat/source_raw/001.htm",
+      "size": 2026084,
+      "sha256": "39026d5e8e04f1144303c1742621531fed44ea84cb4e843d37cc3988e446ab30"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK005_al_muwafaqat/source_raw/002.htm",
+      "size": 1954389,
+      "sha256": "ec053e179000a1ab6c7d06158cc117a567ecb7eef2777de52b351fe9203b543e"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK005_al_muwafaqat/source_raw/003.htm",
+      "size": 2097016,
+      "sha256": "1d70063702182cf5468a75c4765a9805b81c8b0981a19985b9224e1ec6c0c5c4"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK005_al_muwafaqat/source_raw/004.htm",
+      "size": 1702778,
+      "sha256": "2c9acf856d5a16c9cba89a58d329e465cafe3ec2f75996aee16e345ba31c6f96"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK005_al_muwafaqat/source_raw/005.htm",
+      "size": 1513065,
+      "sha256": "0a941c06b2f440b378b518915d56b165cb665198cb737a05e5f79e7e3757ea6b"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK005_al_muwafaqat/source_raw/006.htm",
+      "size": 797272,
+      "sha256": "27afdc9408cd393b22cc0561459c2f22f537a65876d815a70041674d53a2812f"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK006_al_jadwal_i3rab_al_quran/meta.json",
+      "size": 503,
+      "sha256": "fbb1afcab13ff5247c1061b0aca84d94aecc8e341232056a933816dec5d7784a"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK006_al_jadwal_i3rab_al_quran/source_raw/001.htm",
+      "size": 1291898,
+      "sha256": "f72c38d14c31bd6d17d2809c796252b2907cc7b36cccfd78de3e1be6e13886ac"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK006_al_jadwal_i3rab_al_quran/source_raw/002.htm",
+      "size": 1217316,
+      "sha256": "5394e92244d74512dce3645312e2fb54b64ab21c22b45c0f953bb32269214a15"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK006_al_jadwal_i3rab_al_quran/source_raw/003.htm",
+      "size": 1101097,
+      "sha256": "f76b64daf5365c127a4d3b4a3aa4ad68a8bff375d3c5ef213249c459eedd51ac"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK006_al_jadwal_i3rab_al_quran/source_raw/004.htm",
+      "size": 1168313,
+      "sha256": "8de05c2c8592a144630c473f650c1e8358c44157d6db20357f8310322f17ea49"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK006_al_jadwal_i3rab_al_quran/source_raw/005.htm",
+      "size": 1069148,
+      "sha256": "90926ff2b813a6b42487daef5e331c55e928e2687aaee9f732eafbc0cda4ae81"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK006_al_jadwal_i3rab_al_quran/source_raw/006.htm",
+      "size": 1204189,
+      "sha256": "e48b47adebfbf5ac50242f6ae7133fcb94e4546de87eaf953c5a45d0bc3e97cc"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK006_al_jadwal_i3rab_al_quran/source_raw/007.htm",
+      "size": 1085880,
+      "sha256": "3f9fa719559307f1301af905397ff2b3248c075bff0bb9a6ad52a996dcf23775"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK006_al_jadwal_i3rab_al_quran/source_raw/008.htm",
+      "size": 1135611,
+      "sha256": "cb30d39d88f632188bb72570f33f7d154e97db3a6348c04dcb91ce7613fa8dee"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK006_al_jadwal_i3rab_al_quran/source_raw/009.htm",
+      "size": 844479,
+      "sha256": "966321c28dd49619fd373f94a1e95cf8d48019d66f58fcae77f764fc33617aab"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK006_al_jadwal_i3rab_al_quran/source_raw/010.htm",
+      "size": 883726,
+      "sha256": "54bf602c6b617f487e3582fd532aca6a61467418ee22c6036d25b028f32c0b18"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK006_al_jadwal_i3rab_al_quran/source_raw/011.htm",
+      "size": 772474,
+      "sha256": "0b6c8e37eadcb56012ae1558e85340ce68af15d7987a1708f20492478eef10c4"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK006_al_jadwal_i3rab_al_quran/source_raw/012.htm",
+      "size": 846960,
+      "sha256": "aa63ec7ce0261be027617f32fba23a49ed3a97f033d0179cacc998eb8426bdcb"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK006_al_jadwal_i3rab_al_quran/source_raw/013.htm",
+      "size": 893921,
+      "sha256": "042bc0d94d9a0ebf7ba3b91a855a7b945b037b2dfaa29db34f761609f4c1079e"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK006_al_jadwal_i3rab_al_quran/source_raw/014.htm",
+      "size": 800035,
+      "sha256": "634c6f95791f0d8f97f70f0bdd0aa95678f4775347aad48fa4842a2eb591c246"
+    },
+    {
+      "path": "fixtures/shamela_exports/BK006_al_jadwal_i3rab_al_quran/source_raw/015.htm",
+      "size": 1021501,
+      "sha256": "135abf7d041ab86f07d6d297a890facf36c5f82aa468aef042dfeeee4bf2bfdb"
+    },
+    {
+      "path": "README.md",
+      "size": 2832,
+      "sha256": "63e16775d179d378262d256f35a32b9f1934c8267fef3bc918a8149dcbd5a98e"
+    },
+    {
+      "path": "tools/compute_pattern_stats.py",
+      "size": 3284,
+      "sha256": "f63cf5ecddb7bb85a52520adbedc4b100320a2b911f824125a54a9fd14ac5ee7"
+    },
+    {
+      "path": "tools/generate_manifest.py",
+      "size": 1966,
+      "sha256": "76c68bd05ea109c9dd7f1b40b1d6014b39d028b4df87663fe711c72434f909bb"
+    },
+    {
+      "path": "tools/split_gold.py",
+      "size": 1744,
+      "sha256": "3932d8d83d66b334beb4bfdda2484a5a2e79648118c60652387493367bf4bd31"
+    },
+    {
+      "path": "tools/validate_gold.py",
+      "size": 2510,
+      "sha256": "9352ab468760d0f74e72587769cc53329b8b6490529f5ac68861d88154209bfd"
+    },
+    {
+      "path": "training/gold_snippets/heading_candidates_v2.jsonl",
+      "size": 209448,
+      "sha256": "ad40a3f34ac5ba0b117eb28f0cbb53c91525a66d63ae09311169c09c492e4f58"
+    },
+    {
+      "path": "training/gold_snippets/heading_candidates_v2.stats.json",
+      "size": 1011,
+      "sha256": "5c507bebc0b3defc953a399b2c674ac25975e11c4a0d6db5a430b1f8f0b8058b"
+    },
+    {
+      "path": "training/gold_snippets/heading_candidates_v3.jsonl",
+      "size": 226384,
+      "sha256": "41c2c9122e83e3f0b50cfa556611b53f7be86ff06b04b4396b674a11d20a720a"
+    },
+    {
+      "path": "training/gold_snippets/heading_candidates_v3.stats.json",
+      "size": 1018,
+      "sha256": "bc5e06e9c35fc13dde92131d8c9214785fce3956297552ad788f3ecfe367e1a8"
+    },
+    {
+      "path": "training/gold_snippets/heading_gold_v3.cleaned.jsonl",
+      "size": 165965,
+      "sha256": "944607eee50635340c1d5d293d963d6cfc3a6f0861ab71f912e8a2fc51d17524"
+    },
+    {
+      "path": "training/gold_snippets/heading_gold_v3.jsonl",
+      "size": 166175,
+      "sha256": "f97e92a6f37084a0b97af83e4aa2e2d3c569f472fcef62ab2f4667654185afe9"
+    },
+    {
+      "path": "training/gold_snippets/must_not_heading.jsonl",
+      "size": 28367,
+      "sha256": "57d9e10eef91d4292917d715df9d1b11f7541d742870066e4ddbccedb4a286c5"
+    },
+    {
+      "path": "training/gold_snippets/README.md",
+      "size": 917,
+      "sha256": "3f456813ef69dbd2e509caa54101e6ea0fe240735dde4580d5f19fb5217ff1f8"
+    },
+    {
+      "path": "training/gold_snippets/splits/holdout.jsonl",
+      "size": 35336,
+      "sha256": "1ea107bcaf69c08ba21ccaeebf1797f3419ce6a817eb1f4304c4dcb9b211df7b"
+    },
+    {
+      "path": "training/gold_snippets/splits/train.jsonl",
+      "size": 130629,
+      "sha256": "537e969e1bba9f25abb91e99dba4b01249060f326dab1c2bb957b91a8f9afaf6"
+    }
+  ]
+}

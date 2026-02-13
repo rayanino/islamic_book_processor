@@ -1,0 +1,9 @@
+{
+  "book_id": "BK003_taj_al_arus",
+  "title_ar": "تاج العروس من جواهر القاموس",
+  "source": "shamela_desktop_export_html",
+  "export_notes": "Exported from Shamela desktop as HTML, default options (page markers on).",
+  "expected_html_signatures": ["PageText", "PageHead", "PartName", "PageNumber", "span.title", "footnote"],
+  "toc_included": "unknown",
+  "notes": "Raw export kept unchanged in source_raw/. Do NOT edit these files; derive processed artifacts elsewhere."
+}

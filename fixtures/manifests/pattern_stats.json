@@ -1,0 +1,191 @@
+{
+  "books": {
+    "BK001_shadha_al_urf": {
+      "title_ar": "شذا العرف في فن الصرف",
+      "html_files": 1,
+      "bytes_total": 451413,
+      "counts": {
+        "PageText": 190,
+        "PageHead": 189,
+        "PageNumber": 188,
+        "PartName": 188,
+        "span.title": 73,
+        "style.text-align.center": 2,
+        "<font>": 156,
+        "footnote": 126,
+        "<hr>": 312
+      }
+    },
+    "BK002_lisan_al_arab": {
+      "title_ar": "لسان العرب",
+      "html_files": 15,
+      "bytes_total": 50239529,
+      "counts": {
+        "PageText": 8146,
+        "PageHead": 8131,
+        "PageNumber": 8112,
+        "PartName": 8116,
+        "span.title": 895,
+        "style.text-align.center": 30,
+        "<font>": 33453,
+        "footnote": 3761,
+        "<hr>": 11847
+      }
+    },
+    "BK003_taj_al_arus": {
+      "title_ar": "تاج العروس من جواهر القاموس",
+      "html_files": 40,
+      "bytes_total": 63482565,
+      "counts": {
+        "PageText": 21682,
+        "PageHead": 21642,
+        "PageNumber": 21602,
+        "PartName": 21602,
+        "span.title": 13079,
+        "style.text-align.center": 80,
+        "<font>": 16879,
+        "footnote": 81,
+        "<hr>": 21603
+      }
+    },
+    "BK004_sharh_ibn_aqil": {
+      "title_ar": "شرح ابن عقيل على ألفية ابن مالك",
+      "html_files": 4,
+      "bytes_total": 2642620,
+      "counts": {
+        "PageText": 1341,
+        "PageHead": 1337,
+        "PageNumber": 1332,
+        "PartName": 1333,
+        "span.title": 117,
+        "style.text-align.center": 8,
+        "<font>": 2359,
+        "footnote": 635,
+        "<hr>": 1960
+      }
+    },
+    "BK005_al_muwafaqat": {
+      "title_ar": "الموافقات",
+      "html_files": 8,
+      "bytes_total": 10333274,
+      "counts": {
+        "PageText": 3235,
+        "PageHead": 3227,
+        "PageNumber": 3218,
+        "PartName": 3219,
+        "span.title": 197,
+        "style.text-align.center": 16,
+        "<font>": 1250,
+        "footnote": 2577,
+        "<hr>": 5780
+      }
+    },
+    "BK006_al_jadwal_i3rab_al_quran": {
+      "title_ar": "الجدول في إعراب القرآن",
+      "html_files": 15,
+      "bytes_total": 15329771,
+      "counts": {
+        "PageText": 5937,
+        "PageHead": 5922,
+        "PageNumber": 5907,
+        "PartName": 5907,
+        "span.title": 135,
+        "style.text-align.center": 30,
+        "<font>": 40469,
+        "footnote": 4028,
+        "<hr>": 9905
+      }
+    },
+    "BK007_al_mughni_ibn_qudama_turki": {
+      "title_ar": "المغني لابن قدامة - ت التركي",
+      "html_files": 15,
+      "bytes_total": 31193149,
+      "counts": {
+        "PageText": 8000,
+        "PageHead": 7985,
+        "PageNumber": 7970,
+        "PartName": 7970,
+        "span.title": 8574,
+        "style.text-align.center": 30,
+        "<font>": 30511,
+        "footnote": 7798,
+        "<hr>": 15738
+      }
+    },
+    "BK008_tafsir_ibn_kathir_salama": {
+      "title_ar": "تفسير ابن كثير - ت السلامة",
+      "html_files": 9,
+      "bytes_total": 22790859,
+      "counts": {
+        "PageText": 4615,
+        "PageHead": 4606,
+        "PageNumber": 4597,
+        "PartName": 4597,
+        "span.title": 81,
+        "style.text-align.center": 18,
+        "<font>": 66877,
+        "footnote": 4529,
+        "<hr>": 9108
+      }
+    },
+    "BK009_siyar_a3lam_al_nubala_hadith": {
+      "title_ar": "سير أعلام النبلاء - ط الحديث",
+      "html_files": 16,
+      "bytes_total": 28257070,
+      "counts": {
+        "PageText": 9769,
+        "PageHead": 9753,
+        "PageNumber": 9737,
+        "PartName": 9737,
+        "span.title": 146,
+        "style.text-align.center": 32,
+        "<font>": 25464,
+        "footnote": 6719,
+        "<hr>": 16424
+      }
+    },
+    "BK010_fath_al_bari_bukhari_salafiyya": {
+      "title_ar": "فتح الباري بشرح البخاري - ط السلفية",
+      "html_files": 14,
+      "bytes_total": 67426302,
+      "counts": {
+        "PageText": 8038,
+        "PageHead": 8024,
+        "PageNumber": 8010,
+        "PartName": 8010,
+        "span.title": 157,
+        "style.text-align.center": 28,
+        "<font>": 10185,
+        "footnote": 568,
+        "<hr>": 8550
+      }
+    },
+    "BK011_al_muzhir_ulum_al_lugha": {
+      "title_ar": "المزهر في علوم اللغة وأنواعها",
+      "html_files": 2,
+      "bytes_total": 2369082,
+      "counts": {
+        "PageText": 948,
+        "PageHead": 946,
+        "PageNumber": 944,
+        "PartName": 944,
+        "span.title": 648,
+        "style.text-align.center": 4,
+        "<font>": 891,
+        "footnote": 4,
+        "<hr>": 944
+      }
+    }
+  },
+  "totals": {
+    "PageText": 71901,
+    "PageHead": 71762,
+    "PageNumber": 71617,
+    "PartName": 71623,
+    "span.title": 24102,
+    "style.text-align.center": 278,
+    "<font>": 228494,
+    "footnote": 30826,
+    "<hr>": 102171
+  }
+}

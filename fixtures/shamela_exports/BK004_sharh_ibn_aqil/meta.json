@@ -1,0 +1,9 @@
+{
+  "book_id": "BK004_sharh_ibn_aqil",
+  "title_ar": "شرح ابن عقيل على ألفية ابن مالك",
+  "source": "shamela_desktop_export_html",
+  "export_notes": "Exported from Shamela desktop as HTML, default options (page markers on).",
+  "expected_html_signatures": ["PageText", "PageHead", "PartName", "PageNumber", "span.title", "footnote"],
+  "toc_included": "unknown",
+  "notes": "Raw export kept unchanged in source_raw/. Do NOT edit these files; derive processed artifacts elsewhere."
+}

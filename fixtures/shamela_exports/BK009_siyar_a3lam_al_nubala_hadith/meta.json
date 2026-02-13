@@ -1,0 +1,16 @@
+{
+  "book_id": "BK009_siyar_a3lam_al_nubala_hadith",
+  "title_ar": "سير أعلام النبلاء - ط الحديث",
+  "source": "shamela_desktop_export_html",
+  "export_notes": "Exported from Shamela desktop as HTML, default options (page markers on).",
+  "expected_html_signatures": [
+    "PageText",
+    "PageHead",
+    "PartName",
+    "PageNumber",
+    "span.title",
+    "footnote"
+  ],
+  "toc_included": "unknown",
+  "notes": "Raw export kept unchanged in source_raw/. Do NOT edit these files; derive processed artifacts elsewhere."
+}
