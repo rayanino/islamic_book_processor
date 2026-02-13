@@ -1,6 +1,5 @@
 """Command line interface for the Islamic Book Processor."""
 
-from __future__ import annotations
 
 import argparse
 import json
@@ -157,6 +156,9 @@ def build_parser() -> argparse.ArgumentParser:
     approve.add_argument("--run-id", required=True)
     approve.add_argument("--book-id", required=True)
     approve.add_argument("--approve-all", action="store_true")
+    approve.add_argument("--reject-all", action="store_true")
+    approve.add_argument("--reviewer", default="human")
+    approve.add_argument("--minimum-relative-reduction", type=float, default=0.0)
     approve.set_defaults(func=cmd_approve)
 
     return parser
@@ -165,6 +167,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if getattr(args, "approve_all", False) and getattr(args, "reject_all", False):
+        parser.error("--approve-all and --reject-all are mutually exclusive")
     return args.func(args)
 
 
