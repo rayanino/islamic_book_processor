@@ -14,6 +14,7 @@ from ibp.headings.scoring import score_candidates, scored_jsonable
 from ibp.ingest.manifest import build_book_manifest, manifest_as_jsonable, sorted_source_files
 from ibp.logging import configure_run_logger
 from ibp.placement.engine import decision_as_jsonable, place_chunk
+from ibp.registry import RegistryService
 from ibp.run_context import RunContext
 
 
@@ -282,87 +283,114 @@ def cmd_apply(args: argparse.Namespace) -> int:
         )
         return 1
 
+    registry = RegistryService(artifacts_dir=artifacts_dir, run_id=args.run_id)
+    registry.sync_topics(topics)
+
     review_items: list[dict] = []
     placement_items: list[dict] = []
-    for idx, approved in enumerate(approved_items):
-        heading_index = matched_heading_indexes[idx]
-        heading = strict_headings[heading_index]
-        heading_line_index = heading["line_number"] - 1
+    try:
+        for idx, approved in enumerate(approved_items):
+            heading_index = matched_heading_indexes[idx]
+            heading = strict_headings[heading_index]
+            heading_line_index = heading["line_number"] - 1
 
-        if idx + 1 < len(matched_heading_indexes):
-            next_heading_line_index = strict_headings[matched_heading_indexes[idx + 1]]["line_number"] - 1
-        else:
-            next_heading_line_index = len(markdown_lines)
+            if idx + 1 < len(matched_heading_indexes):
+                next_heading_line_index = strict_headings[matched_heading_indexes[idx + 1]]["line_number"] - 1
+            else:
+                next_heading_line_index = len(markdown_lines)
 
-        body_lines = markdown_lines[heading_line_index + 1:next_heading_line_index]
-        chunk_body = "\n".join(line for line in body_lines if line.strip())
-        decision = place_chunk(
-            chunk_heading=heading.get("heading", ""),
-            chunk_body=chunk_body,
-            topics=topics,
-        )
-        jsonable = decision_as_jsonable(decision)
-        placement_payload = {
-            "approved_item_index": idx,
-            "approved_item": approved,
-            "chunk_features": {
+            body_lines = markdown_lines[heading_line_index + 1:next_heading_line_index]
+            chunk_body = "\n".join(line for line in body_lines if line.strip())
+            decision = place_chunk(
+                chunk_heading=heading.get("heading", ""),
+                chunk_body=chunk_body,
+                topics=topics,
+            )
+            jsonable = decision_as_jsonable(decision)
+            chunk_features = {
                 "heading": heading.get("heading", ""),
                 "body_excerpt": chunk_body[:500],
-            },
-            **jsonable,
-        }
-        placement_items.append(placement_payload)
+            }
+            placement_payload = {
+                "approved_item_index": idx,
+                "approved_item": approved,
+                "chunk_features": chunk_features,
+                **jsonable,
+            }
+            placement_items.append(placement_payload)
 
-        if decision.status == "review":
-            review_items.append(
-                {
-                    "kind": "topic_placement",
-                    "approved_item_index": idx,
-                    "machine_reasons": jsonable["reasons"],
-                    "candidate_alternatives": jsonable["candidate_alternatives"],
-                    "chunk_features": placement_payload["chunk_features"],
-                    "approved_item": approved,
-                }
+            chunk_key = f"{args.book_id}:{heading.get('line_number')}:{heading.get('heading', '')}"
+            chunk_version_id = registry.add_chunk_version(
+                chunk_key=chunk_key,
+                approved_item=approved,
+                chunk_features=chunk_features,
+            )
+            registry.add_placement_decision(
+                chunk_version_id=chunk_version_id,
+                placement_payload=placement_payload,
             )
 
-    _write_json(
-        artifacts_dir / "topic_placements.applied.json",
-        {
-            "book_id": args.book_id,
-            "run_id": args.run_id,
-            "topics_source": "artifacts/topic_registry.json#topics",
-            "items": placement_items,
-        },
-    )
+            if decision.status == "review":
+                review_items.append(
+                    {
+                        "kind": "topic_placement",
+                        "approved_item_index": idx,
+                        "machine_reasons": jsonable["reasons"],
+                        "candidate_alternatives": jsonable["candidate_alternatives"],
+                        "chunk_features": placement_payload["chunk_features"],
+                        "approved_item": approved,
+                    }
+                )
 
-    if review_items:
         _write_json(
-            run_dir / "_REVIEW" / "topic_placements.review.json",
+            artifacts_dir / "topic_placements.applied.json",
             {
                 "book_id": args.book_id,
                 "run_id": args.run_id,
-                "status": "review_required",
-                "items": review_items,
+                "topics_source": "artifacts/topic_registry.json#topics",
+                "items": placement_items,
             },
         )
 
-    _write_json(
-        artifacts_dir / "chunking.applied.json",
-        {
-            "book_id": args.book_id,
-            "run_id": args.run_id,
-            "status": "applied",
-            "boundaries_source": "artifacts/chunk_plan.approved.json#items",
-            "applied_items": approved_items,
-            "topic_placement": {
-                "status": "review_required" if review_items else "assigned",
-                "review_count": len(review_items),
-                "placements_source": "artifacts/topic_placements.applied.json#items",
-            },
-        },
-    )
-    return 0
+        if review_items:
+            _write_json(
+                run_dir / "_REVIEW" / "topic_placements.review.json",
+                {
+                    "book_id": args.book_id,
+                    "run_id": args.run_id,
+                    "status": "review_required",
+                    "items": review_items,
+                },
+            )
 
+        _write_json(
+            artifacts_dir / "chunking.applied.json",
+            {
+                "book_id": args.book_id,
+                "run_id": args.run_id,
+                "status": "applied",
+                "boundaries_source": "artifacts/chunk_plan.approved.json#items",
+                "applied_items": approved_items,
+                "topic_placement": {
+                    "status": "review_required" if review_items else "assigned",
+                    "review_count": len(review_items),
+                    "placements_source": "artifacts/topic_placements.applied.json#items",
+                },
+            },
+        )
+        registry.add_projection(
+            projection_kind="chunking.applied",
+            source_ref="artifacts/chunk_plan.approved.json#items",
+            payload={
+                "book_id": args.book_id,
+                "run_id": args.run_id,
+                "applied_items": approved_items,
+                "placement_items": placement_items,
+            },
+        )
+        return 0
+    finally:
+        registry.close()
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="ibp", description="Islamic Book Processor")
